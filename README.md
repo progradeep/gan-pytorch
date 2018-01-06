@@ -1,1 +1,1 @@
-progradeep
+DCGAN implementation with pytorch
