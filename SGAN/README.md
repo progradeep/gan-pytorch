@@ -1,1 +1,1 @@
-DCGAN implementation with pytorch
+SGAN implementation in pytorch
