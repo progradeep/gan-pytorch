@@ -1,1 +1,1 @@
-DCGAN implementation with pytorch
+InfoGAN implementation with pytorch
