@@ -96,7 +96,7 @@ class Trainer(object):
 
                 AE_x = self.netD(inputv)
 
-                D_noise.resize_(self.batch_size, self.nz).normal_(0, 1)
+                D_noise.resize_(batch_size, self.nz).normal_(0, 1)
                 D_noisev = Variable(D_noise)
                 D_fake = self.netG(D_noisev)
                 AE_G_d = self.netD(D_fake.detach())
@@ -110,7 +110,7 @@ class Trainer(object):
                 optimizerD.step()
 
                 #train G network
-                G_noise.resize_(self.batch_size, self.nz).normal_(0, 1)
+                G_noise.resize_(batch_size, self.nz).normal_(0, 1)
                 G_noisev = Variable(G_noise)
                 G_fake = self.netG(G_noisev)
                 AE_G_g = self.netD(G_fake)

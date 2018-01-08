@@ -98,7 +98,7 @@ class Trainer(object):
                 D_x = output.data.mean()
 
                 # train with fake
-                noise.resize_(self.batch_size, self.nz, 1, 1).normal_(0, 1)
+                noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
                 labelv = Variable(label.fill_(fake_label))
