@@ -6,6 +6,7 @@ from torch.autograd import Variable
 
 import models.acgan as acgan
 
+
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -13,6 +14,7 @@ def weights_init(m):
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
+
 
 class Trainer(object):
     def __init__(self, config, data_loader):
@@ -36,7 +38,7 @@ class Trainer(object):
 
         self.outf = config.outf
 
-        self.nl = config.nl         # add nl
+        self.nl = config.nl  # add nl
 
         self.build_model()
 
@@ -53,10 +55,10 @@ class Trainer(object):
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
-        
+
     def train(self):
         criterion = nn.BCELoss()
-        cross_entropy_loss = nn.CrossEntropyLoss()       # add class loss
+        cross_entropy_loss = nn.CrossEntropyLoss()  # add class loss
 
         input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
         noise = torch.FloatTensor(self.batch_size, self.nz + self.nl)
@@ -83,16 +85,16 @@ class Trainer(object):
                 ############################
                 # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
                 ###########################
-                for p in self.netD.parameters(): # reset requires_grad
-                    p.requires_grad = True # they are set to False below in netG update
+                for p in self.netD.parameters():  # reset requires_grad
+                    p.requires_grad = True  # they are set to False below in netG update
 
                 # train with real
                 self.netD.zero_grad()
-                real_cpu, c_label = data         # add c label
+                real_cpu, c_label = data  # add c label
                 batch_size = real_cpu.size(0)
                 if self.cuda:
                     real_cpu = real_cpu.cuda()
-                    c_label = c_label.cuda()     # add c label
+                    c_label = c_label.cuda()  # add c label
                 input.resize_as_(real_cpu).copy_(real_cpu)
                 label.resize_(batch_size).fill_(real_label)
                 class_label = c_label
@@ -100,7 +102,6 @@ class Trainer(object):
                 inputv = Variable(input)
                 labelv = Variable(label)
                 class_labelv = Variable(class_label)
-
 
                 out1, out2 = self.netD(inputv)
                 errD_real = criterion(out1, labelv)
@@ -120,7 +121,7 @@ class Trainer(object):
                 D_G_z1 = out1.data.mean()
 
                 errD_D = errD_real + errD_fake
-                errD_C = errC_real + errC_fake          # add errC
+                errD_C = errC_real + errC_fake  # add errC
                 err = errD_D + errD_C
                 err.backward()
                 optimizerD.step()
@@ -129,36 +130,33 @@ class Trainer(object):
                 # (2) Update G network: maximize log(D(G(z)))
                 ###########################
                 for p in self.netD.parameters():
-                    p.requires_grad = False # to avoid computation
+                    p.requires_grad = False  # to avoid computation
                 self.netG.zero_grad()
                 labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
                 out1, out2 = self.netD(fake)
 
                 errG_D = criterion(out1, labelv)
                 errG_C = cross_entropy_loss(out2, class_labelv)
-                err = errG_D +errG_C
+                err = errG_D + errG_C
 
                 D_G_z2 = out1.data.mean()
 
                 err.backward()
                 optimizerG.step()
 
-                print('[%d/%d][%d/%d] Loss_D_D: %.4f Loss_D_C: %.4f  Loss_G_D: %.4f  Loss_G_C: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
-                      % (epoch, self.niter, i, len(self.data_loader),
-                         errD_D.data[0], errD_C.data[0], errG_D.data[0], errG_C.data[0], D_x, D_G_z1, D_G_z2))
+                print(
+                    '[%d/%d][%d/%d] Loss_D_D: %.4f Loss_D_C: %.4f  Loss_G_D: %.4f  Loss_G_C: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
+                    % (epoch, self.niter, i, len(self.data_loader),
+                       errD_D.data[0], errD_C.data[0], errG_D.data[0], errG_C.data[0], D_x, D_G_z1, D_G_z2))
                 if i % 1 == 0:
                     vutils.save_image(real_cpu,
-                            '%s/real_samples.png' % self.outf,
-                            normalize=True)
+                                      '%s/real_samples.png' % self.outf,
+                                      normalize=True)
                     fake = self.netG(fixed_noise)
                     vutils.save_image(fake.data,
-                            '%s/fake_samples_epoch_%03d.png' % (self.outf, epoch),
-                            normalize=True)
+                                      '%s/fake_samples_epoch_%03d.png' % (self.outf, epoch),
+                                      normalize=True)
 
             # do checkpointing
             torch.save(self.netG.state_dict(), '%s/netG_epoch_%03d.pth' % (self.outf, epoch))
-            torch.save(self.netD.state_dict(), '%s/netD_epoch_%03d.pth' % (self.outf, epoch)) 
-
-
-
-
+            torch.save(self.netD.state_dict(), '%s/netD_epoch_%03d.pth' % (self.outf, epoch))
