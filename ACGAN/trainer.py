@@ -95,11 +95,12 @@ class Trainer(object):
                     c_label = c_label.cuda()     # add c label
                 input.resize_as_(real_cpu).copy_(real_cpu)
                 label.resize_(batch_size).fill_(real_label)
-                class_label.resize_as_(c_label).copy_(c_label)
+                class_label = c_label
 
                 inputv = Variable(input)
                 labelv = Variable(label)
                 class_labelv = Variable(class_label)
+
 
                 out1, out2 = self.netD(inputv)
                 errD_real = criterion(out1, labelv)
@@ -108,7 +109,7 @@ class Trainer(object):
                 D_x = out1.data.mean()
 
                 # train with fake
-                noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
+                noise.resize_(batch_size, self.nz + self.nl,1,1).normal_(0, 1)
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
                 labelv = Variable(label.fill_(fake_label))
@@ -146,7 +147,7 @@ class Trainer(object):
                 print('[%d/%d][%d/%d] Loss_D_D: %.4f Loss_D_C: %.4f  Loss_G_D: %.4f  Loss_G_C: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
                       % (epoch, self.niter, i, len(self.data_loader),
                          errD_D.data[0], errD_C.data[0], errG_D.data[0], errG_C.data[0], D_x, D_G_z1, D_G_z2))
-                if i % 100 == 0:
+                if i % 1 == 0:
                     vutils.save_image(real_cpu,
                             '%s/real_samples.png' % self.outf,
                             normalize=True)

@@ -78,6 +78,7 @@ class _netD(nn.Module):
             output_aux = nn.paralle.data_parallel(self.aux, output, range(self.ngpu))
         else:
             output = self.main(input)
+            output = output.squeeze()
             output_dis = self.dis(output)
             output_aux = self.aux(output)
-        return output_dis.view(-1, 1).squeeze(1), output_aux.view(-1, 10).squeeze(1)
+        return output_dis.view(-1, 1).squeeze(), output_aux.view(-1, 10).squeeze()
