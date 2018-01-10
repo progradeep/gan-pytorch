@@ -1,10 +1,14 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils as vutils
 from torch.autograd import Variable
 
-import models.fgan as fgan
+import models.began as began
+
+def L1Loss(a, b):
+    return torch.mean(torch.abs(a-b))
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -22,21 +26,26 @@ class Trainer(object):
         self.ngpu = int(config.ngpu)
         self.nc = int(config.nc)
         self.nz = int(config.nz)
-        self.ngf = int(config.ngf)
-        self.ndf = int(config.ndf)
+        self.n_hidden = int(config.n_hidden)
         self.cuda = config.cuda
 
         self.batch_size = config.batch_size
         self.image_size = config.image_size
 
+        self.conv_hidden_num = config.conv_hidden_num
+
         self.lr = config.lr
         self.beta1 = config.beta1
+        self.beta2 = config.beta2
+        
+        self.gamma = config.gamma
+        self.lambda_k = config.lambda_k
+
+        self.lr_update_step = config.lr_update_step
 
         self.niter = config.niter
 
         self.outf = config.outf
-
-        self.f_div = config.f_div
 
         self.build_model()
 
@@ -45,78 +54,82 @@ class Trainer(object):
             self.netG.cuda()
 
     def build_model(self):
-        self.netG = fgan._netG(self.ngpu, self.nz, self.ngf, self.nc)
-        self.netG.apply(weights_init)
-        if self.config.netG != '':
-            self.netG.load_state_dict(torch.load(self.config.netG))
-        self.netD = fgan._netD(self.ngpu, self.nc, self.ndf, self.f_div)
+        self.netD = began._netD(self.ngpu, self.nz, self.n_hidden, self.nc)
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
-        
+        self.netG = began._netG(self.ngpu, self.nz, self.n_hidden, self.nc)
+        self.netG.apply(weights_init)
+        if self.config.netG != '':
+            self.netG.load_state_dict(torch.load(self.config.netG))
+       
     def train(self):
+        l1=L1Loss
+
         input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
-        noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
-        fixed_noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
-        ## In f-gan, we don't need labels tensor
+        D_noise = torch.FloatTensor(self.batch_size, self.nz)
+        G_noise = torch.FloatTensor(self.batch_size, self.nz)
+        fixed_noise = torch.FloatTensor(self.batch_size, self.nz).normal_(0, 1)
 
         if self.cuda:
             input = input.cuda()
-            noise, fixed_noise = noise.cuda(), fixed_noise.cuda()
+            D_noise, G_noise, fixed_noise = D_noise.cuda(), G_noise.cuda(), fixed_noise.cuda()
 
         fixed_noise = Variable(fixed_noise)
 
         # setup optimizer
-        optimizerD = optim.Adam(self.netD.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        optimizerG = optim.Adam(self.netG.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        optimizerD = optim.Adam(self.netD.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
+        optimizerG = optim.Adam(self.netG.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
+
+        k_t = 0
 
         for epoch in range(self.niter):
             for i, data in enumerate(self.data_loader, 0):
-                ############################
-                # (1) Update D network: minimize f_star(D(G)) - D
-                ###########################
-                for p in self.netD.parameters(): # reset requires_grad
-                    p.requires_grad = True # they are set to False below in netG update
 
-                # train with real
-                self.netD.zero_grad()
+                # train D network
                 real_cpu, _ = data
                 batch_size = real_cpu.size(0)
                 if self.cuda:
                     real_cpu = real_cpu.cuda()
                 input.resize_as_(real_cpu).copy_(real_cpu)
                 inputv = Variable(input)
-                output = self.netD(inputv)
-                errD_real = -output    # -D
-                errD_real.backward()
-                D_x = output.data.mean()
 
-                # train with fake
-                noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
-                noisev = Variable(noise)
-                fake = self.netG(noisev)
-                output = self.netD(fake.detach())
-                errD_fake = self.netD.f_star(output)   # F_star(D(G))
-                errD_fake.backward()
-                D_G_z1 = output.data.mean()
-                errD = errD_real + errD_fake  # F_star(D(G)) - D
+                AE_x = self.netD(inputv)
+
+                D_noise.resize_(batch_size, self.nz).normal_(0, 1)
+                D_noisev = Variable(D_noise)
+                D_fake = self.netG(D_noisev)
+                AE_G_d = self.netD(D_fake.detach())
+
+                d_loss_real = l1(AE_x, inputv)
+                d_loss_fake = l1(AE_G_d, D_fake.detach())
+                d_loss = d_loss_real - k_t * d_loss_fake
+
+                self.netD.zero_grad()
+                d_loss.backward()
                 optimizerD.step()
 
-                ############################
-                # (2) Update G network: minimize f_star(D(G))
-                ###########################
-                for p in self.netD.parameters():
-                    p.requires_grad = False # to avoid computation
+                #train G network
+                G_noise.resize_(batch_size, self.nz).normal_(0, 1)
+                G_noisev = Variable(G_noise)
+                G_fake = self.netG(G_noisev)
+                AE_G_g = self.netD(G_fake)
+
+                g_loss = l1(G_fake, AE_G_g)
+
                 self.netG.zero_grad()
-                output = self.netD(fake)
-                errG = self.netD.f_Star(fake)    # f_star(D(G))
-                errG.backward()
-                D_G_z2 = output.data.mean()
+                g_loss.backward()
                 optimizerG.step()
 
-                print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
+                g_d_balance = (self.gamma * d_loss_real - d_loss_fake).data[0]
+                k_t += self.lambda_k * g_d_balance
+                k_t = max(min(1, k_t), 0)
+
+                measure = d_loss_real.data[0] + abs(g_d_balance)
+
+                print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f Measure: %.4f'
                       % (epoch, self.niter, i, len(self.data_loader),
-                         errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
+                         d_loss_fake.data[0], g_loss.data[0], measure))
                 if i % 100 == 0:
                     vutils.save_image(real_cpu,
                             '%s/real_samples.png' % self.outf,
