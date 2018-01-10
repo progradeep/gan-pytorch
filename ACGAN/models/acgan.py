@@ -40,7 +40,7 @@ class _netG(nn.Module):
         return output
 
 class _netD(nn.Module):
-    def __init__(self, ngpu, nl, nc, ndf):
+    def __init__(self, ngpu, nl, ndf, nc):
         super(_netD, self).__init__()
         self.ngpu = ngpu
         self.main = nn.Sequential(
