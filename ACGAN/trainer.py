@@ -60,7 +60,7 @@ class Trainer(object):
 
         input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
         noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
-        fixed_noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
+        fixed_noise = torch.FloatTensor(self.batch_size, self.nz + self.nl).normal_(0, 1)
         label = torch.FloatTensor(self.batch_size)
         class_label = torch.FloatTensor(self.batch_size, self.nl)  # add class label
         real_label = 1
@@ -109,7 +109,7 @@ class Trainer(object):
                 D_x = out1.data.mean()
 
                 # train with fake
-                noise.resize_(batch_size, self.nz + self.nl,1,1).normal_(0, 1)
+                noise.resize_(batch_size, self.nz + self.nl).normal_(0, 1)
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
                 labelv = Variable(label.fill_(fake_label))
@@ -121,9 +121,8 @@ class Trainer(object):
 
                 errD_D = errD_real + errD_fake
                 errD_C = errC_real + errC_fake          # add errC
-
-                errD_D.backward()
-                errD_C.backward()
+                err = errD_D + errD_C
+                err.backward()
                 optimizerD.step()
 
                 ############################
@@ -137,11 +136,11 @@ class Trainer(object):
 
                 errG_D = criterion(out1, labelv)
                 errG_C = cross_entropy_loss(out2, class_labelv)
+                err = errG_D +errG_C
 
                 D_G_z2 = out1.data.mean()
 
-                errG_D.backward()
-                errG_C.backward()
+                err.backward()
                 optimizerG.step()
 
                 print('[%d/%d][%d/%d] Loss_D_D: %.4f Loss_D_C: %.4f  Loss_G_D: %.4f  Loss_G_C: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'

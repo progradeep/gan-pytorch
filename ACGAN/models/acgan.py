@@ -6,12 +6,14 @@ class _netG(nn.Module):
     def __init__(self, ngpu, nz, nl, ngf, nc):
         super(_netG, self).__init__()
         self.ngpu = ngpu
-        self.main = nn.Sequential(
+        self.layer1 = nn.Sequential(
             # input is Z
             nn.Linear(nz + nl, ngf * 16),
             nn.ReLU(True),
+        )
+        self.layer2 = nn.Sequential(
             # state size. (ngf*16) x 1 x 1
-            nn.ConvTranspose2d(ngf * 16, ngf * 8, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf * 16, ngf * 8, 4, 1, 0, bias=False),
             nn.BatchNorm2d(ngf * 8),
             nn.ReLU(True),
             # state size. (ngf*8) x 4 x 4
@@ -32,9 +34,15 @@ class _netG(nn.Module):
             # state size. (nc) x 64 x 64
         )
 
+    def main(self,input):
+        x = self.layer1(input)
+        x = x.view(x.size()[0], -1, 1, 1)
+        return self.layer2(x)
+
+
     def forward(self, input):
         if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
-            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
+            output = nn.parallel.data_parallel(self.main(input), input, range(self.ngpu))
         else:
             output = self.main(input)
         return output
