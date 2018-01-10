@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.parallel
 
-
 class _netG(nn.Module):
     def __init__(self, ngpu, nz, nl, ngf, nc):
         super(_netG, self).__init__()
@@ -32,7 +31,6 @@ class _netG(nn.Module):
             nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False),
             nn.Tanh())
             # state size. (nc) x 64 x 64
-
 
     def main(self, input):
         x = self.layer1(input)
