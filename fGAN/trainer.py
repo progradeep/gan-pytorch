@@ -4,7 +4,7 @@ import torch.optim as optim
 import torchvision.utils as vutils
 from torch.autograd import Variable
 
-import models.dcgan as dcgan
+import models.fgan as fgan
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -36,6 +36,8 @@ class Trainer(object):
 
         self.outf = config.outf
 
+        self.f_div = config.f_div
+
         self.build_model()
 
         if self.cuda:
@@ -43,28 +45,23 @@ class Trainer(object):
             self.netG.cuda()
 
     def build_model(self):
-        self.netG = dcgan._netG(self.ngpu, self.nz, self.ngf, self.nc)
+        self.netG = fgan._netG(self.ngpu, self.nz, self.ngf, self.nc)
         self.netG.apply(weights_init)
         if self.config.netG != '':
             self.netG.load_state_dict(torch.load(self.config.netG))
-        self.netD = dcgan._netD(self.ngpu, self.nc, self.ndf)
+        self.netD = fgan._netD(self.ngpu, self.nc, self.ndf, self.f_div)
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
         
     def train(self):
-        criterion = nn.BCELoss()
-
         input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
         noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
         fixed_noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
-        label = torch.FloatTensor(self.batch_size)
-        real_label = 1
-        fake_label = 0
+        ## In f-gan, we don't need labels tensor
 
         if self.cuda:
-            criterion.cuda()
-            input, label = input.cuda(), label.cuda()
+            input = input.cuda()
             noise, fixed_noise = noise.cuda(), fixed_noise.cuda()
 
         fixed_noise = Variable(fixed_noise)
@@ -76,7 +73,7 @@ class Trainer(object):
         for epoch in range(self.niter):
             for i, data in enumerate(self.data_loader, 0):
                 ############################
-                # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+                # (1) Update D network: minimize f_star(D(G)) - D
                 ###########################
                 for p in self.netD.parameters(): # reset requires_grad
                     p.requires_grad = True # they are set to False below in netG update
@@ -88,12 +85,9 @@ class Trainer(object):
                 if self.cuda:
                     real_cpu = real_cpu.cuda()
                 input.resize_as_(real_cpu).copy_(real_cpu)
-                label.resize_(batch_size).fill_(real_label)
                 inputv = Variable(input)
-                labelv = Variable(label)
-
                 output = self.netD(inputv)
-                errD_real = criterion(output, labelv)
+                errD_real = -output    # -D
                 errD_real.backward()
                 D_x = output.data.mean()
 
@@ -101,23 +95,21 @@ class Trainer(object):
                 noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
-                labelv = Variable(label.fill_(fake_label))
                 output = self.netD(fake.detach())
-                errD_fake = criterion(output, labelv)
+                errD_fake = self.netD.f_star(output)   # F_star(D(G))
                 errD_fake.backward()
                 D_G_z1 = output.data.mean()
-                errD = errD_real + errD_fake
+                errD = errD_real + errD_fake  # F_star(D(G)) - D
                 optimizerD.step()
 
                 ############################
-                # (2) Update G network: maximize log(D(G(z)))
+                # (2) Update G network: minimize f_star(D(G))
                 ###########################
                 for p in self.netD.parameters():
                     p.requires_grad = False # to avoid computation
                 self.netG.zero_grad()
-                labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
                 output = self.netD(fake)
-                errG = criterion(output, labelv)
+                errG = self.netD.f_Star(fake)    # f_star(D(G))
                 errG.backward()
                 D_G_z2 = output.data.mean()
                 optimizerG.step()

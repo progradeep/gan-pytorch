@@ -37,10 +37,11 @@ class _netG(nn.Module):
         return output
 
 class _netD(nn.Module):
-    def __init__(self, ngpu, nc, ndf):
+    def __init__(self, ngpu, nc, ndf, f_div):
         super(_netD, self).__init__()
+        self.f_div = f_div
         self.ngpu = ngpu
-        self.main = nn.Sequential(
+        self.layer = nn.Sequential(
             # input is (nc) x 64 x 64
             nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
@@ -57,13 +58,46 @@ class _netD(nn.Module):
             nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
-            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-            nn.Sigmoid()
+            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False)
+
+            ## delete sigmoid layer in f-gan
         )
+
+    def activation_func(self, x):
+        if self.f_div == "KL" or "Pearson":
+            return x
+        elif self.f_div == "RKL":
+            return -x.exp()
+        elif self.f_div == "Neyman" or "Squared_Hellinger":
+            return 1-x.exp()
+        elif self.f_div == "JS":
+            return (2*x.sigmoid()).log()
+        else:       # GAN
+            return x.sigmoid().log()
+
+    def f_star(self, x):
+        if self.f_div == "KL":
+            return (x-1).exp()
+        elif self.f_div == "RKL":
+            return 1-(-x).exp()
+        elif self.f_div == "Pearson":
+            return 0.25*x*x+x
+        elif self.f_div == "Neyman":
+            return 2-2*(1-x).sqrt()
+        elif self.f_div == "Squared_Hellinger":
+            return x/(1-x)
+        elif self.f_div == "JS":
+            return -(2-x.exp()).log()
+        else:        # GAN
+            return -(1-x.exp()).log()
+
+    def main(self, input):
+        output = self.layer(input)
+        return self.activation_func(output)
 
     def forward(self, input):
         if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
-            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
+            output = nn.parallel.data_parallel(self.main(input), input, range(self.ngpu))
         else:
             output = self.main(input)
 
