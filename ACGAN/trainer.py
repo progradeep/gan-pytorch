@@ -4,7 +4,7 @@ import torch.optim as optim
 import torchvision.utils as vutils
 from torch.autograd import Variable
 
-import models.dcgan as dcgan
+import models.acgan as acgan
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -36,6 +36,8 @@ class Trainer(object):
 
         self.outf = config.outf
 
+        self.nl = config.nl         # add nl
+
         self.build_model()
 
         if self.cuda:
@@ -43,28 +45,31 @@ class Trainer(object):
             self.netG.cuda()
 
     def build_model(self):
-        self.netG = dcgan._netG(self.ngpu, self.nz, self.ngf, self.nc)
+        self.netG = acgan._netG(self.ngpu, self.nz, self.ngf, self.nc)
         self.netG.apply(weights_init)
         if self.config.netG != '':
             self.netG.load_state_dict(torch.load(self.config.netG))
-        self.netD = dcgan._netD(self.ngpu, self.nc, self.ndf)
+        self.netD = acgan._netD(self.ngpu, self.nc, self.ndf)
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
         
     def train(self):
         criterion = nn.BCELoss()
+        cross_entropy_loss = nn.CrossEntropyLoss()       # add class loss
 
         input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
         noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
         fixed_noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
         label = torch.FloatTensor(self.batch_size)
+        class_label = torch.FloatTensor(self.batch_size, self.nl)  # add class label
         real_label = 1
         fake_label = 0
 
         if self.cuda:
             criterion.cuda()
-            input, label = input.cuda(), label.cuda()
+            cross_entropy_loss.cuda()
+            input, label, class_label = input.cuda(), label.cuda(), class_label.cuda()  # add class label
             noise, fixed_noise = noise.cuda(), fixed_noise.cuda()
 
         fixed_noise = Variable(fixed_noise)
@@ -83,30 +88,41 @@ class Trainer(object):
 
                 # train with real
                 self.netD.zero_grad()
-                real_cpu, _ = data
+                real_cpu, c_label = data         # add c label
                 batch_size = real_cpu.size(0)
                 if self.cuda:
                     real_cpu = real_cpu.cuda()
+                    c_label = c_label.cuda()     # add c label
                 input.resize_as_(real_cpu).copy_(real_cpu)
                 label.resize_(batch_size).fill_(real_label)
+                class_label.resize_as_(c_label).copy_(c_label)
+
                 inputv = Variable(input)
                 labelv = Variable(label)
+                class_labelv = Variable(class_label)
 
-                output = self.netD(inputv)
-                errD_real = criterion(output, labelv)
-                errD_real.backward()
-                D_x = output.data.mean()
+                out1, out2 = self.netD(inputv)
+                errD_real = criterion(out1, labelv)
+                errC_real = cross_entropy_loss(out2, class_labelv)
+
+                D_x = out1.data.mean()
 
                 # train with fake
                 noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
                 labelv = Variable(label.fill_(fake_label))
-                output = self.netD(fake.detach())
-                errD_fake = criterion(output, labelv)
-                errD_fake.backward()
-                D_G_z1 = output.data.mean()
-                errD = errD_real + errD_fake
+                out1, out2 = self.netD(fake.detach())
+                errD_fake = criterion(out1, labelv)
+                errC_fake = cross_entropy_loss(out2, class_labelv)
+
+                D_G_z1 = out1.data.mean()
+
+                errD_D = errD_real + errD_fake
+                errD_C = errC_real + errC_fake          # add errC
+
+                errD_D.backward()
+                errD_C.backward()
                 optimizerD.step()
 
                 ############################
@@ -116,15 +132,20 @@ class Trainer(object):
                     p.requires_grad = False # to avoid computation
                 self.netG.zero_grad()
                 labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
-                output = self.netD(fake)
-                errG = criterion(output, labelv)
-                errG.backward()
-                D_G_z2 = output.data.mean()
+                out1, out2 = self.netD(fake)
+
+                errG_D = criterion(out1, labelv)
+                errG_C = cross_entropy_loss(out2, class_labelv)
+
+                D_G_z2 = out1.data.mean()
+
+                errG_D.backward()
+                errG_C.backward()
                 optimizerG.step()
 
-                print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
+                print('[%d/%d][%d/%d] Loss_D_D: %.4f Loss_D_C: %.4f  Loss_G_D: %.4f  Loss_G_C: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
                       % (epoch, self.niter, i, len(self.data_loader),
-                         errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
+                         errD_D.data[0], errD_C.data[0], errG_D.data[0], errG_C.data[0], D_x, D_G_z1, D_G_z2))
                 if i % 100 == 0:
                     vutils.save_image(real_cpu,
                             '%s/real_samples.png' % self.outf,
