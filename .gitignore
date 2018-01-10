@@ -1,3 +1,4 @@
 samples
 *.pyc
-
+SGAN/samples
+SGAN/cifar10

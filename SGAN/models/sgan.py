@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.parallel
+import torch.nn.functional as F
 
 class _netG(nn.Module):
-    def __init__(self, ngpu, nz, ngf, nc):
+    def __init__(self, nz, ngf, nc):
         super(_netG, self).__init__()
-        self.ngpu = ngpu
         self.main = nn.Sequential(
             # input is Z, going into a convolution
             nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
@@ -30,17 +30,15 @@ class _netG(nn.Module):
         )
 
     def forward(self, input):
-        if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
-            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
-        else:
-            output = self.main(input)
+        output = self.main(input)
         return output
 
 class _netD(nn.Module):
-    def __init__(self, ngpu, nc, ndf):
+    def __init__(self, nc, ndf, num_classes):
         super(_netD, self).__init__()
-        self.ngpu = ngpu
-        self.main = nn.Sequential(
+        self.ndf = ndf
+        self.num_classes = num_classes
+        self.conv = nn.Sequential(
             # input is (nc) x 64 x 64
             nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
@@ -55,18 +53,18 @@ class _netD(nn.Module):
             # state size. (ndf*4) x 8 x 8
             nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 8),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.LeakyReLU(0.2, inplace=True)
             # state size. (ndf*8) x 4 x 4
-            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-            nn.Sigmoid()
         )
+        self.fc = nn.Linear(ndf*8*4*4,num_classes+1,bias = False)
 
     def forward(self, input):
-        if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
-            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
-        else:
-            output = self.main(input)
+        output = self.conv(input)
+        output = output.view(-1, self.ndf*8*4*4)
+        output = self.fc(output)
+        output = F.softmax(output)
 
-        return output.view(-1, 1).squeeze(1)
+        return output.squeeze()
+            # output.view(-1, 11).squeeze(1)
 
 
