@@ -59,7 +59,7 @@ class Trainer(object):
         cross_entropy_loss = nn.CrossEntropyLoss()       # add class loss
 
         input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
-        noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
+        noise = torch.FloatTensor(self.batch_size, self.nz + self.nl)
         fixed_noise = torch.FloatTensor(self.batch_size, self.nz + self.nl).normal_(0, 1)
         label = torch.FloatTensor(self.batch_size)
         class_label = torch.FloatTensor(self.batch_size, self.nl)  # add class label
