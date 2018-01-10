@@ -62,7 +62,6 @@ class _netD(nn.Module):
         output = self.conv(input)
         output = output.view(-1, self.ndf*8*4*4)
         output = self.fc(output)
-        output = F.softmax(output)
 
         return output.squeeze()
             # output.view(-1, 11).squeeze(1)

@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -118,7 +119,7 @@ class Trainer(object):
                 output = self.netD(fake.detach())
                 errD_fake = criterion(output, labelv)
                 errD_fake.backward()
-                D_G_z1 = output.data.mean()   # D(x)
+                D_G_z1 = output.data.mean()  # D(x)
                 errD = errD_real + errD_fake
                 optimizerD.step()
 
