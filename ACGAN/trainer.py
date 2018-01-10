@@ -45,7 +45,7 @@ class Trainer(object):
             self.netG.cuda()
 
     def build_model(self):
-        self.netG = acgan._netG(self.ngpu, self.nz, self.ngf, self.nc)
+        self.netG = acgan._netG(self.ngpu, self.nz, self.nl, self.ngf, self.nc)
         self.netG.apply(weights_init)
         if self.config.netG != '':
             self.netG.load_state_dict(torch.load(self.config.netG))
