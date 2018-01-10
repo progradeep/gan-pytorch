@@ -49,7 +49,7 @@ class Trainer(object):
         self.netG.apply(weights_init)
         if self.config.netG != '':
             self.netG.load_state_dict(torch.load(self.config.netG))
-        self.netD = acgan._netD(self.ngpu, self.nc, self.ndf)
+        self.netD = acgan._netD(self.ngpu, self.nl, self.ndf, self.nc)
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
