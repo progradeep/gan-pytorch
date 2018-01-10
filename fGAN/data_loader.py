@@ -3,6 +3,7 @@ import torch.utils.data
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 
+
 def get_loader(_dataset, dataroot, batch_size, num_workers, image_size, shuffle=True):
     if _dataset in ['imagenet', 'folder', 'lfw']:
         # folder dataset

@@ -8,6 +8,7 @@ from data_loader import get_loader
 from config import get_config
 from trainer import Trainer
 
+
 def main(config):
     if config.outf is None:
         config.outf = 'samples'
@@ -27,10 +28,11 @@ def main(config):
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
     data_loader = get_loader(_dataset=config.dataset, dataroot=config.dataroot, batch_size=config.batch_size,
-                                num_workers=int(config.workers), image_size=config.image_size)
+                             num_workers=int(config.workers), image_size=config.image_size)
 
     trainer = Trainer(config, data_loader)
     trainer.train()
+
 
 if __name__ == "__main__":
     config = get_config()

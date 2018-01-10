@@ -6,6 +6,7 @@ from torch.autograd import Variable
 
 import models.fgan as fgan
 
+
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -13,6 +14,7 @@ def weights_init(m):
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
+
 
 class Trainer(object):
     def __init__(self, config, data_loader):
@@ -53,7 +55,7 @@ class Trainer(object):
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
-        
+
     def train(self):
         input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
         noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
@@ -75,8 +77,8 @@ class Trainer(object):
                 ############################
                 # (1) Update D network: minimize f_star(D(G)) - D
                 ###########################
-                for p in self.netD.parameters(): # reset requires_grad
-                    p.requires_grad = True # they are set to False below in netG update
+                for p in self.netD.parameters():  # reset requires_grad
+                    p.requires_grad = True  # they are set to False below in netG update
 
                 # train with real
                 self.netD.zero_grad()
@@ -87,8 +89,7 @@ class Trainer(object):
                 input.resize_as_(real_cpu).copy_(real_cpu)
                 inputv = Variable(input)
                 output = self.netD(inputv)
-                errD_real = -output    # -D
-                errD_real.backward()
+                errD_real = -output.mean()  # -D
                 D_x = output.data.mean()
 
                 # train with fake
@@ -96,40 +97,37 @@ class Trainer(object):
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
                 output = self.netD(fake.detach())
-                errD_fake = self.netD.f_star(output)   # F_star(D(G))
-                errD_fake.backward()
+                errD_fake = self.netD.f_star(output).mean()  # F_star(D(G))
                 D_G_z1 = output.data.mean()
                 errD = errD_real + errD_fake  # F_star(D(G)) - D
+
+                errD.backward()
                 optimizerD.step()
 
                 ############################
                 # (2) Update G network: minimize f_star(D(G))
                 ###########################
                 for p in self.netD.parameters():
-                    p.requires_grad = False # to avoid computation
+                    p.requires_grad = False  # to avoid computation
                 self.netG.zero_grad()
                 output = self.netD(fake)
-                errG = self.netD.f_Star(fake)    # f_star(D(G))
+                errG = self.netD.f_star(fake).mean()  # f_star(D(G))
                 errG.backward()
                 D_G_z2 = output.data.mean()
                 optimizerG.step()
 
                 print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
                       % (epoch, self.niter, i, len(self.data_loader),
-                         errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
-                if i % 100 == 0:
+                         errD.data, errG.data, D_x, D_G_z1, D_G_z2))
+                if i % 1 == 0:
                     vutils.save_image(real_cpu,
-                            '%s/real_samples.png' % self.outf,
-                            normalize=True)
+                                      '%s/real_samples.png' % self.outf,
+                                      normalize=True)
                     fake = self.netG(fixed_noise)
                     vutils.save_image(fake.data,
-                            '%s/fake_samples_epoch_%03d.png' % (self.outf, epoch),
-                            normalize=True)
+                                      '%s/fake_samples_epoch_%03d.png' % (self.outf, epoch),
+                                      normalize=True)
 
             # do checkpointing
             torch.save(self.netG.state_dict(), '%s/netG_epoch_%03d.pth' % (self.outf, epoch))
-            torch.save(self.netD.state_dict(), '%s/netD_epoch_%03d.pth' % (self.outf, epoch)) 
-
-
-
-
+            torch.save(self.netD.state_dict(), '%s/netD_epoch_%03d.pth' % (self.outf, epoch))
