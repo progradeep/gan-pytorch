@@ -30,11 +30,7 @@ def get_loader(_dataset, dataroot, batch_size, num_workers, image_size, shuffle=
                                ]))
     elif _dataset == 'mnist':
         dataset = dset.MNIST(root=dataroot, download=True,
-                               transform=transforms.Compose([
-                                   transforms.Resize(image_size),
-                                   transforms.ToTensor(),
-                                   transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                               ]))
+                               transform=transforms.ToTensor())
     elif _dataset == 'fake':
         dataset = dset.FakeData(image_size=(3, image_size, image_size),
                                 transform=transforms.ToTensor())

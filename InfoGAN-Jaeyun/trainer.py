@@ -15,6 +15,15 @@ def weights_init(m):
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
 
+class log_gaussian:
+
+  def __call__(self, x, mu, var):
+
+    logli = -0.5*(var.mul(2*np.pi)+1e-6).log() - \
+            (x-mu).pow(2).div(var.mul(2.0)+1e-6)
+    
+    return logli.sum(1).mean().mul(-1)
+
 
 def noise_sample(dis_c, con_c, noise, batch_size, nz):
 
@@ -24,18 +33,10 @@ def noise_sample(dis_c, con_c, noise, batch_size, nz):
 
     dis_c.data.copy_(torch.Tensor(c))
     con_c.data.uniform_(-1.0, 1.0)
-    noise.data.normal_(0, 1)
+    noise.data.uniform_(-1.0, 1.0)
     z = torch.cat([noise, dis_c, con_c], 1).view(-1, nz + 12, 1, 1)
 
     return z, idx
-
-class log_gaussian:
-	def __call__(self, x, mu, var):
-
-		logli = -0.5*(var.mul(2*np.pi)+1e-6).log() - \
-				(x-mu).pow(2).div(var.mul(2.0)+1e-6)
-    
-		return logli.sum(1).mean().mul(-1)
 
 class Trainer(object):
     def __init__(self, config, data_loader):
@@ -52,7 +53,8 @@ class Trainer(object):
         self.batch_size = config.batch_size
         self.image_size = config.image_size
 
-        self.lr = config.lr
+        self.lrD = config.lrD
+        self.lrG = config.lrG
         self.beta1 = config.beta1
 
         self.niter = config.niter
@@ -91,10 +93,10 @@ class Trainer(object):
         criterionQ_con = log_gaussian()
 
         input = torch.FloatTensor(self.batch_size, self.nc, self.image_size, self.image_size)
-        noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
+        noise = torch.FloatTensor(self.batch_size, self.nz)
         dis_c = torch.FloatTensor(self.batch_size, 10)
         con_c = torch.FloatTensor(self.batch_size, 2)
-        fixed_noise = torch.FloatTensor(100, self.nz, 1, 1).normal_(0, 1)
+        fixed_noise = torch.FloatTensor(100, self.nz).uniform_(-1, 1)
         label = torch.FloatTensor(self.batch_size)
         real_label = 1
         fake_label = 0
@@ -102,7 +104,6 @@ class Trainer(object):
         if self.cuda:
             criterion.cuda()
             criterionQ_dis.cuda()
-            criterionQ_con
             input, label = input.cuda(), label.cuda()
             noise, fixed_noise = noise.cuda(), fixed_noise.cuda()
             dis_c, con_c = dis_c.cuda(), con_c.cuda()
@@ -113,7 +114,6 @@ class Trainer(object):
         c = np.repeat(c, 10, 0).reshape(-1, 1)
         c1 = np.hstack([c, np.zeros_like(c)])
         c2 = np.hstack([np.zeros_like(c), c])
-
         c1 = torch.Tensor(c1)
         c2 = torch.Tensor(c2)
 
@@ -128,8 +128,8 @@ class Trainer(object):
             one_hot = Variable(one_hot.cuda())
 
         # setup optimizer
-        optimizerD = optim.Adam(self.netD.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        optimizerG = optim.Adam(self.netG.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        optimizerD = optim.Adam([{'params':self.netShareDQ.parameters()}, {'params':self.netD.parameters()}], lr=self.lrD, betas=(self.beta1, 0.999))
+        optimizerG = optim.Adam([{'params':self.netG.parameters()}, {'params': self.netQ.parameters()}], lr=self.lrG, betas=(self.beta1, 0.999))
 
         for epoch in range(self.niter):
             for i, data in enumerate(self.data_loader, 0):
@@ -140,7 +140,7 @@ class Trainer(object):
                     p.requires_grad = True # they are set to False below in netG update
 
                 # train with real
-                self.netD.zero_grad()
+                optimizerD.zero_grad()
                 real_cpu, _ = data
                 batch_size = real_cpu.size(0)
                 if self.cuda:
@@ -177,17 +177,17 @@ class Trainer(object):
                 ###########################
                 for p in self.netD.parameters():
                     p.requires_grad = False # to avoid computation
-                self.netG.zero_grad()
+                optimizerG.zero_grad()
                 labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
                 shared_output = self.netShareDQ(fake)
                 output = self.netD(shared_output)
-                errG = criterion(output, labelv)
+                err = criterion(output, labelv)
                 q_digit, q_mu, q_var = self.netQ(shared_output)
                 class_ = torch.LongTensor(idx).cuda()
                 target = Variable(class_)
                 err_dis = criterionQ_dis(q_digit, target)
-                err_con = criterionQ_con(con_c, q_mu, q_var)*0.1
-                errG += (err_dis + err_con)
+                err_con = criterionQ_con(con_cv, q_mu, q_var)*0.1
+                errG = err + err_dis + err_con
                 errG.backward()
                 D_G_z2 = output.data.mean()
                 optimizerG.step()
@@ -203,12 +203,12 @@ class Trainer(object):
                     fake = self.netG(z)
                     vutils.save_image(fake.data,
                             '%s/fake_samples_c1_epoch_%03d.png' % (self.outf, epoch),
-                            normalize=True, nrow=10)
+                            nrow=10)
                     z = torch.cat([fixed_noise, one_hot, c2], 1).view(-1, self.nz + 12, 1, 1)
                     fake = self.netG(z)
                     vutils.save_image(fake.data,
-                            '%s/fake_samples_c1_epoch_%03d.png' % (self.outf, epoch),
-                            normalize=True, nrow=10)
+                            '%s/fake_samples_c2_epoch_%03d.png' % (self.outf, epoch),
+                            nrow=10)
 
             # do checkpointing
             torch.save(self.netG.state_dict(), '%s/netG_epoch_%03d.pth' % (self.outf, epoch))
