@@ -88,8 +88,7 @@ class Trainer(object):
                     real_cpu = real_cpu.cuda()
                 input.resize_as_(real_cpu).copy_(real_cpu)
                 inputv = Variable(input)
-                output = self.netD(inputv)
-                errD_real = -output.mean()  # -D
+                errD_real = -self.netD(inputv).mean()  # -D
 
                 # train with fake
                 noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
@@ -103,13 +102,15 @@ class Trainer(object):
                 optimizerD.step()
 
                 ############################
-                # (2) Update G network: minimize f_star(D(G))
+                # (2) Update G network: minimize -f_star(D(G))
                 ###########################
                 for p in self.netD.parameters():
                     p.requires_grad = False  # to avoid computation
                 self.netG.zero_grad()
                 output = self.netD(fake)
-                errG = (-self.netD.f_star(output)).mean()  # f_star(D(G))
+                print("%.4f" % noisev.data.mean())
+                print("%.4f" %fake.data.mean())
+                errG = -(self.netD.f_star(output)).mean()  # -f_star(D(G))
                 errG.backward()
                 optimizerG.step()
 

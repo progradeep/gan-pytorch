@@ -99,7 +99,6 @@ class _netD(nn.Module):
     def main(self, input):
         output = self.layer(input)
         output = output.squeeze()
-        print(output)
         output = self.activation_func(output)
         return output
 

@@ -5,6 +5,7 @@
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/fGAN/config.py" afterPath="$PROJECT_DIR$/fGAN/config.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/fGAN/models/fgan.py" afterPath="$PROJECT_DIR$/fGAN/models/fgan.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/fGAN/trainer.py" afterPath="$PROJECT_DIR$/fGAN/trainer.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -18,8 +19,8 @@
       <file leaf-file-name="trainer.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/fGAN/trainer.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="296">
-              <caret line="89" column="40" lean-forward="true" selection-start-line="89" selection-start-column="40" selection-end-line="89" selection-end-column="40" />
+            <state relative-caret-position="532">
+              <caret line="115" column="0" lean-forward="true" selection-start-line="115" selection-start-column="0" selection-end-line="115" selection-end-column="0" />
               <folding>
                 <element signature="e#0#12#0" expanded="true" />
               </folding>
@@ -27,21 +28,31 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="fgan.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/fGAN/models/fgan.py">
+      <file leaf-file-name="trainer.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/DCGAN/trainer.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="476">
-              <caret line="101" column="21" lean-forward="true" selection-start-line="101" selection-start-column="21" selection-end-line="101" selection-end-column="21" />
+            <state relative-caret-position="468">
+              <caret line="118" column="40" lean-forward="true" selection-start-line="118" selection-start-column="40" selection-end-line="118" selection-end-column="40" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="config.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="fgan.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/fGAN/models/fgan.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="716">
+              <caret line="94" column="20" lean-forward="true" selection-start-line="94" selection-start-column="20" selection-end-line="94" selection-end-column="20" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="config.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/fGAN/config.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="308">
-              <caret line="12" column="50" lean-forward="true" selection-start-line="12" selection-start-column="50" selection-end-line="12" selection-end-column="50" />
+            <state relative-caret-position="392">
+              <caret line="15" column="53" lean-forward="false" selection-start-line="15" selection-start-column="53" selection-end-line="15" selection-end-column="53" />
               <folding />
             </state>
           </provider>
@@ -59,13 +70,13 @@
         <option value="$PROJECT_DIR$/fGAN/data_loader.py" />
         <option value="$PROJECT_DIR$/fGAN/main.py" />
         <option value="$PROJECT_DIR$/DCGAN/config.py" />
-        <option value="$PROJECT_DIR$/DCGAN/trainer.py" />
-        <option value="$PROJECT_DIR$/fGAN/trainer.py" />
         <option value="$PROJECT_DIR$/ACGAN/config.py" />
         <option value="$PROJECT_DIR$/ACGAN/trainer.py" />
         <option value="$PROJECT_DIR$/ACGAN/models/acgan.py" />
-        <option value="$PROJECT_DIR$/fGAN/models/fgan.py" />
         <option value="$PROJECT_DIR$/fGAN/config.py" />
+        <option value="$PROJECT_DIR$/fGAN/models/fgan.py" />
+        <option value="$PROJECT_DIR$/DCGAN/trainer.py" />
+        <option value="$PROJECT_DIR$/fGAN/trainer.py" />
       </list>
     </option>
   </component>
@@ -98,6 +109,11 @@
             <path>
               <item name="GAN-pytorch" type="b2602c69:ProjectViewProjectNode" />
               <item name="GAN-pytorch" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="GAN-pytorch" type="b2602c69:ProjectViewProjectNode" />
+              <item name="GAN-pytorch" type="462c0819:PsiDirectoryNode" />
+              <item name="DCGAN" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="GAN-pytorch" type="b2602c69:ProjectViewProjectNode" />
@@ -423,14 +439,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/DCGAN/trainer.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="104">
-          <caret line="102" column="40" lean-forward="true" selection-start-line="102" selection-start-column="40" selection-end-line="102" selection-end-column="40" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/DCGAN/models/dcgan.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
@@ -439,28 +447,36 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/fGAN/config.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="392">
+          <caret line="15" column="53" lean-forward="false" selection-start-line="15" selection-start-column="53" selection-end-line="15" selection-end-column="53" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/fGAN/models/fgan.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="716">
+          <caret line="94" column="20" lean-forward="true" selection-start-line="94" selection-start-column="20" selection-end-line="94" selection-end-column="20" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/fGAN/trainer.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="296">
-          <caret line="89" column="40" lean-forward="true" selection-start-line="89" selection-start-column="40" selection-end-line="89" selection-end-column="40" />
+        <state relative-caret-position="532">
+          <caret line="115" column="0" lean-forward="true" selection-start-line="115" selection-start-column="0" selection-end-line="115" selection-end-column="0" />
           <folding>
             <element signature="e#0#12#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/fGAN/models/fgan.py">
+    <entry file="file://$PROJECT_DIR$/DCGAN/trainer.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="476">
-          <caret line="101" column="21" lean-forward="true" selection-start-line="101" selection-start-column="21" selection-end-line="101" selection-end-column="21" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/fGAN/config.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="308">
-          <caret line="12" column="50" lean-forward="true" selection-start-line="12" selection-start-column="50" selection-end-line="12" selection-end-column="50" />
+        <state relative-caret-position="468">
+          <caret line="118" column="40" lean-forward="true" selection-start-line="118" selection-start-column="40" selection-end-line="118" selection-end-column="40" />
           <folding />
         </state>
       </provider>
