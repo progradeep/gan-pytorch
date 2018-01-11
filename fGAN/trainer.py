@@ -107,9 +107,11 @@ class Trainer(object):
                 for p in self.netD.parameters():
                     p.requires_grad = False  # to avoid computation
                 self.netG.zero_grad()
+
+                noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
+                noisev = Variable(noise)
+                fake = self.netG(noisev)
                 output = self.netD(fake)
-                print("%.4f" % noisev.data.mean())
-                print("%.4f" %fake.data.mean())
                 errG = -(self.netD.f_star(output)).mean()  # -f_star(D(G))
                 errG.backward()
                 optimizerG.step()

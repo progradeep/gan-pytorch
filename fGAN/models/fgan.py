@@ -76,8 +76,8 @@ class _netD(nn.Module):
         elif self.f_div == "JS":
             return (2 * x.sigmoid()).log()
         else:  # GAN
-            y= x.sigmoid().log()
-            return y
+            return x.sigmoid().log()
+
 
     def f_star(self, x):
         if self.f_div == "KL":
@@ -93,8 +93,8 @@ class _netD(nn.Module):
         elif self.f_div == "JS":
             return -(2 - x.exp()).log()
         else:  # GAN
-            y=  -(1 - x.exp()).log()
-            return y
+            return -(1 - x.exp()).log()
+
 
     def main(self, input):
         output = self.layer(input)
