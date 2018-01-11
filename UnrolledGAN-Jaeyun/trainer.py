@@ -9,13 +9,12 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import models.dcgan as dcgan
-from utils import sample_mog
+from utils import circle
 
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Linear') != -1:
-        #m.weight.data.normal_(0.0, 0.8)
-        nn.init.orthogonal(m.weight.data, gain=1.2)
+        nn.init.orthogonal(m.weight.data, gain=0.8)
 
 class Trainer(object):
     def __init__(self, config):
@@ -75,59 +74,59 @@ class Trainer(object):
 
         for epoch in range(self.niter):
 
-            data = sample_mog(self.batch_size)
+            data, _ = circle(self.batch_size)
+            if self.cuda:
+                data = data.cuda()
 
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
             ###########################
-            for p in self.netD.parameters(): # reset requires_grad
-                p.requires_grad = True # they are set to False below in netG update
 
             # train with real
             self.netD.zero_grad()
-            real_cpu = torch.Tensor(data)
-            batch_size = real_cpu.size(0)
-            if self.cuda:
-                real_cpu = real_cpu.cuda()
-            input.resize_as_(real_cpu).copy_(real_cpu)
-            label.resize_(batch_size).fill_(real_label)
-            inputv = Variable(input)
+            
+            label.fill_(real_label)
+            inputv = Variable(data)
             labelv = Variable(label)
 
             output = self.netD(inputv)
             errD_real = criterion(output, labelv)
-            errD_real.backward()
             D_x = output.data.mean()
+            errD_real.backward()
 
             # train with fake
-            noise.resize_(batch_size, self.nz).normal_(0, 1)
+            noise.normal_(0, 1)
             noisev = Variable(noise)
             fake = self.netG(noisev)
+            
             labelv = Variable(label.fill_(fake_label))
             output = self.netD(fake.detach())
             errD_fake = criterion(output, labelv)
-            errD_fake.backward()
             D_G_z1 = output.data.mean()
+            errD_fake.backward()
+
             errD = errD_real + errD_fake
+
             optimizerD.step()
 
             ############################
             # (2) Update G network: minimize log(1 - D(G(z)))
             ###########################
-            for p in self.netD.parameters():
-                p.requires_grad = False # to avoid computation
             self.netG.zero_grad()
-            labelv = Variable(label.fill_(fake_label))  # fake labels are real for generator cost
+            
+            labelv = Variable(label.fill_(fake_label))
             output = self.netD(fake)
             errG = -criterion(output, labelv)
-            errG.backward()
             D_G_z2 = output.data.mean()
+            
+            errG.backward()
+            
             optimizerG.step()
 
             print('[%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
                   % (epoch, self.niter,
                      errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
-            if epoch % 10 == 0:
+            if epoch % 1000 == 0:
                 plt.scatter(data[:,0], data[:,1], s=10)
                 plt.savefig(
                         '%s/real_samples.png' % self.outf)
@@ -136,4 +135,3 @@ class Trainer(object):
                 plt.savefig(
                         '%s/fake_samples_epoch_%03d.png' % (self.outf, epoch))
                 plt.close()
-

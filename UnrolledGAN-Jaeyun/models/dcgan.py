@@ -8,13 +8,13 @@ class _netG(nn.Module):
         self.ngpu = ngpu
         self.main = nn.Sequential(
             # input is Z, going into a FC
-            nn.Linear(nz, ngf, bias=False),
+            nn.Linear(nz, ngf),
             nn.ReLU(),
             # state size. ngf
-            nn.Linear(ngf, ngf, bias=False),
+            nn.Linear(ngf, ngf),
             nn.ReLU(),
             # state size. ngf
-            nn.Linear(ngf, nc, bias=False)
+            nn.Linear(ngf, nc)
             # state size. nc
         )
 
@@ -31,10 +31,10 @@ class _netD(nn.Module):
         self.ngpu = ngpu
         self.main = nn.Sequential(
             # input is nc
-            nn.Linear(nc, ndf, bias=False),
+            nn.Linear(nc, ndf),
             nn.ReLU(),
             # state size. ndf
-            nn.Linear(ndf, 1, bias=False),
+            nn.Linear(ndf, 1),
             nn.Sigmoid()
             # state size. 1
         )
