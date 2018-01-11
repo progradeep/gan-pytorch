@@ -83,7 +83,7 @@ class _netD(nn.Module):
         if self.f_div == "KL":
             return (x - 1).exp()
         elif self.f_div == "RKL":
-            return -1 - (-x).exp()
+            return -1 - (-x).log()
         elif self.f_div == "Pearson":
             return 0.25 * x * x + x
         elif self.f_div == "Neyman":
@@ -98,7 +98,6 @@ class _netD(nn.Module):
 
     def main(self, input):
         output = self.layer(input)
-        output = output.squeeze()
         output = self.activation_func(output)
         return output
 

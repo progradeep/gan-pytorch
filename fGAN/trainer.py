@@ -119,13 +119,14 @@ class Trainer(object):
                 print('[%d/%d][%d/%d] Loss_D_real: %.4f Loss_D_fake: %.4f Loss_G: %.4f'
                       % (epoch, self.niter, i, len(self.data_loader),
                          errD_real.data, errD_fake.data, errG.data))
-                if i % 1 == 0:
+                if epoch == 0 and i == 0:
                     vutils.save_image(real_cpu,
                                       '%s/real_samples.png' % self.outf,
                                       normalize=True)
+                if i % 20 == 0:
                     fake = self.netG(fixed_noise)
                     vutils.save_image(fake.data,
-                                      '%s/fake_samples_epoch_%03d.png' % (self.outf, epoch),
+                                      '%s/fake_samples_epoch_%03d_%d.png' % (self.outf, epoch,i),
                                       normalize=True)
 
             # do checkpointing
