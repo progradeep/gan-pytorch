@@ -82,17 +82,17 @@ class _netD (nn.Module):
         if self.f_div == "KL":
             return (x - 1).exp ()
         elif self.f_div == "RKL":
-            return -1 - (10 ^ (-6) - x).log ()
+            return -1 - (0.000001 - x).log ()
         elif self.f_div == "Pearson":
             return 0.25 * x * x + x
         elif self.f_div == "Neyman":
             return 2 - 2 * (1 - x).sqrt ()
         elif self.f_div == "Squared_Hellinger":
-            return x / (1 + 10 ^ (-6) - x)
+            return x / (1 + 0.000001 - x)
         elif self.f_div == "JS":
-            return -(2 + 10 ^ (-6) - x.exp ()).log ()
+            return -(2 + 0.000001 - x.exp ()).log ()
         else:  # GAN
-            return -(1 + 10 ^ (-6) - x.exp ()).log ()
+            return -(1 + 0.000001 - x.exp ()).log ()
 
     def main (self, input):
         output = self.layer (input)
