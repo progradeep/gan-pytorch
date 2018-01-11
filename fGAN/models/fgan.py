@@ -67,22 +67,23 @@ class _netD(nn.Module):
         )
 
     def activation_func(self, x):
-        if self.f_div == "KL" or "Pearson":
+        if self.f_div == "KL" or self.f_div == "Pearson":
             return x
         elif self.f_div == "RKL":
             return -x.exp()
-        elif self.f_div == "Neyman" or "Squared_Hellinger":
+        elif self.f_div == "Neyman" or self.f_div == "Squared_Hellinger":
             return 1 - x.exp()
         elif self.f_div == "JS":
             return (2 * x.sigmoid()).log()
         else:  # GAN
-            return x.sigmoid().log()
+            y= x.sigmoid().log()
+            return y
 
     def f_star(self, x):
         if self.f_div == "KL":
             return (x - 1).exp()
         elif self.f_div == "RKL":
-            return 1 - (-x).exp()
+            return -1 - (-x).exp()
         elif self.f_div == "Pearson":
             return 0.25 * x * x + x
         elif self.f_div == "Neyman":
@@ -92,15 +93,18 @@ class _netD(nn.Module):
         elif self.f_div == "JS":
             return -(2 - x.exp()).log()
         else:  # GAN
-            return -(1 - x.exp()).log()
+            y=  -(1 - x.exp()).log()
+            return y
 
     def main(self, input):
         output = self.layer(input)
-        return self.activation_func(output)
+        output = output.squeeze()
+        output = self.activation_func(output)
+        return output
 
     def forward(self, input):
         if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
-            output = nn.parallel.data_parallel(self.main(input), input, range(self.ngpu))
+            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
             output = self.main(input)
 

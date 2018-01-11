@@ -90,7 +90,6 @@ class Trainer(object):
                 inputv = Variable(input)
                 output = self.netD(inputv)
                 errD_real = -output.mean()  # -D
-                D_x = output.data.mean()
 
                 # train with fake
                 noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
@@ -98,7 +97,6 @@ class Trainer(object):
                 fake = self.netG(noisev)
                 output = self.netD(fake.detach())
                 errD_fake = self.netD.f_star(output).mean()  # F_star(D(G))
-                D_G_z1 = output.data.mean()
                 errD = errD_real + errD_fake  # F_star(D(G)) - D
 
                 errD.backward()
@@ -111,14 +109,13 @@ class Trainer(object):
                     p.requires_grad = False  # to avoid computation
                 self.netG.zero_grad()
                 output = self.netD(fake)
-                errG = self.netD.f_star(fake).mean()  # f_star(D(G))
+                errG = (-self.netD.f_star(output)).mean()  # f_star(D(G))
                 errG.backward()
-                D_G_z2 = output.data.mean()
                 optimizerG.step()
 
-                print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
+                print('[%d/%d][%d/%d] Loss_D_real: %.4f Loss_D_fake: %.4f Loss_G: %.4f'
                       % (epoch, self.niter, i, len(self.data_loader),
-                         errD.data, errG.data, D_x, D_G_z1, D_G_z2))
+                         errD_real.data, errD_fake.data, errG.data))
                 if i % 1 == 0:
                     vutils.save_image(real_cpu,
                                       '%s/real_samples.png' % self.outf,
