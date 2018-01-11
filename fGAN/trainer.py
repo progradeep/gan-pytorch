@@ -123,7 +123,7 @@ class Trainer(object):
                     vutils.save_image(real_cpu,
                                       '%s/real_samples.png' % self.outf,
                                       normalize=True)
-                if i % 20 == 0:
+                if i  == 0:
                     fake = self.netG(fixed_noise)
                     vutils.save_image(fake.data,
                                       '%s/fake_samples_epoch_%03d_%d.png' % (self.outf, epoch,i),
