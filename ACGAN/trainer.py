@@ -61,10 +61,13 @@ class Trainer(object):
         cross_entropy_loss = nn.CrossEntropyLoss()  # add class loss
 
         input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
-        noise = torch.FloatTensor(self.batch_size, self.nz + self.nl)
-        fixed_noise = torch.FloatTensor(self.batch_size, self.nz + self.nl).normal_(0, 1)
+        noise = torch.FloatTensor(self.batch_size, self.nz)
+        fixed_noise = torch.FloatTensor(self.batch_size, self.nz).normal_(0, 1)
+        noise2 = torch.FloatTensor(self.batch_size, self.nl)
+        fixed_noise2 = torch.FloatTensor(self.batch_size, self.nl).normal_(0, 1)
+        fixed_noise2 = torch.nn.functional.softmax(Variable(fixed_noise2))
+        class_label = torch.LongTensor(self.batch_size)  # add class label
         label = torch.FloatTensor(self.batch_size)
-        class_label = torch.FloatTensor(self.batch_size, self.nl)  # add class label
         real_label = 1
         fake_label = 0
 
@@ -110,9 +113,13 @@ class Trainer(object):
                 D_x = out1.data.mean()
 
                 # train with fake
-                noise.resize_(batch_size, self.nz + self.nl).normal_(0, 1)
+                noise.resize_(batch_size, self.nz).normal_(0, 1)
                 noisev = Variable(noise)
-                fake = self.netG(noisev)
+                noise2.resize_(batch_size, self.nl).normal_(0, 1)
+                noise2v = torch.nn.functional.softmax(Variable(noise2))
+
+
+                fake = self.netG(noisev, noise2v)
                 labelv = Variable(label.fill_(fake_label))
                 out1, out2 = self.netD(fake.detach())
                 errD_fake = criterion(out1, labelv)
@@ -152,7 +159,7 @@ class Trainer(object):
                     vutils.save_image(real_cpu,
                                       '%s/real_samples.png' % self.outf,
                                       normalize=True)
-                    fake = self.netG(fixed_noise)
+                    fake = self.netG(fixed_noise, fixed_noise2)
                     vutils.save_image(fake.data,
                                       '%s/fake_samples_epoch_%03d.png' % (self.outf, epoch),
                                       normalize=True)
