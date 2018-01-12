@@ -48,17 +48,17 @@ class Trainer(object):
             self.netG.cuda()
 
     def build_model(self):
-        self.netG = fgan._netG(self.ngpu, self.nz)
+        self.netG = fgan._netG(self.ngpu, self.nz, dataset=self.dataset)
         self.netG.apply(weights_init)
         if self.config.netG != '':
             self.netG.load_state_dict(torch.load(self.config.netG))
-        self.netD = fgan._netD(self.ngpu, self.f_div)
+        self.netD = fgan._netD(self.ngpu, self.f_div, dataset=self.dataset)
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
 
     def train(self):
-        input = torch.FloatTensor(self.batch_size, self.nc , self.image_size, self.image_size)
+        input = torch.FloatTensor(self.batch_size, self.nc, self.image_size, self.image_size)
         noise = torch.FloatTensor(self.batch_size, self.nz)
         fixed_noise = torch.FloatTensor(self.batch_size, self.nz).normal_(0, 1)
         ## In f-gan, we don't need labels tensor
@@ -118,7 +118,7 @@ class Trainer(object):
                 errG.backward()
                 optimizerG.step()
 
-                if i % 100 == 0:
+                if i % 1 == 0:
                     print('[%d/%d][%d/%d] Loss_D_real: %.4f Loss_D_fake: %.4f Loss_G: %.4f'
                           % (epoch, self.niter, i, len(self.data_loader),
                              errD_real.data, errD_fake.data, errG.data))
@@ -126,10 +126,11 @@ class Trainer(object):
                     vutils.save_image(real_cpu,
                                       '%s/real_samples.png' % self.outf,
                                       normalize=True)
-                if i  == 0:
+                if i % 100 == 0:
                     fake = self.netG(fixed_noise)
                     vutils.save_image(fake.data,
-                                      '%s/%s_fake_samples_epoch_%03d_%s_%f.png' % (self.outf, self.dataset, epoch, self.f_div, self.lr),
+                                      '%s/%s_fake_samples_epoch_%03d_%s_%f.png' % (
+                                      self.outf, self.dataset, epoch, self.f_div, self.lr),
                                       normalize=True)
 
             # do checkpointing

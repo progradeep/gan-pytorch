@@ -23,7 +23,7 @@ def get_loader(_dataset, dataroot, batch_size, num_workers, image_size, shuffle=
                                  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
                              ]))
     elif _dataset == 'lsun':
-        dataset = dset.LSUN(db_path=dataroot, classes=['bedroom_train'],
+        dataset = dset.LSUN(db_path=dataroot, classes=['conference_room_train'],
                             transform=transforms.Compose([
                                 transforms.Resize(image_size),
                                 transforms.CenterCrop(image_size),
