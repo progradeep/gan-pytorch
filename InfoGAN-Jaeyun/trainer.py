@@ -186,7 +186,7 @@ class Trainer(object):
                     err_c = criterionQ(q_list[k], target[k])
                     err_c_list.append(err_c)
 
-                errG = err + torch.mean(err_c)*0.1
+                errG = err + torch.mean(err_c)
 
                 errG.backward()
                 D_G_z2 = output.data.mean()
