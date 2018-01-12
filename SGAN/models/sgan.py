@@ -4,8 +4,9 @@ import torch.nn.parallel
 import torch.nn.functional as F
 
 class _netG(nn.Module):
-    def __init__(self, nz, ngf, nc):
+    def __init__(self, nz, ngf, nc, ngpu):
         super(_netG, self).__init__()
+        self.ngpu = ngpu
         self.main = nn.Sequential(
             # input is Z, going into a convolution
             nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
@@ -30,14 +31,18 @@ class _netG(nn.Module):
         )
 
     def forward(self, input):
-        output = self.main(input)
+        if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
+            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
+        else:
+            output = self.main(input)
         return output
 
 class _netD(nn.Module):
-    def __init__(self, nc, ndf, num_classes):
+    def __init__(self, nc, ndf, num_classes, ngpu):
         super(_netD, self).__init__()
         self.ndf = ndf
         self.num_classes = num_classes
+        self.ngpu = ngpu
         self.conv = nn.Sequential(
             # input is (nc) x 64 x 64
             nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
@@ -58,12 +63,20 @@ class _netD(nn.Module):
         )
         self.fc = nn.Linear(ndf*8*4*4,num_classes+1,bias = False)
 
-    def forward(self, input):
+    def main(self, input):
         output = self.conv(input)
-        output = output.view(-1, self.ndf*8*4*4)
+        output = output.view(-1, self.ndf * 8 * 4 * 4)
         output = self.fc(output)
-
         return output.squeeze()
-            # output.view(-1, 11).squeeze(1)
+
+    def softmax(self, input):
+        return F.softmax(input).data
 
 
+
+    def forward(self, input):
+        if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
+            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
+        else:
+            output = self.main(input)
+        return output

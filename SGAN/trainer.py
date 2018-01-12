@@ -1,9 +1,10 @@
-import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils as vutils
 from torch.autograd import Variable
+import torch.nn.functional as F
+
 
 import models.sgan as sgan
 
@@ -26,6 +27,7 @@ class Trainer(object):
         self.ngf = int(config.ngf)
         self.ndf = int(config.ndf)
         self.cuda = config.cuda
+        self.ngpu = int(config.ngpu)
 
         self.num_classes = int(config.num_classes)
         self.batch_size = config.batch_size
@@ -45,27 +47,24 @@ class Trainer(object):
             self.netG.cuda()
 
     def build_model(self):
-        self.netG = sgan._netG(self.nz, self.ngf, self.nc)
+        self.netG = sgan._netG(self.nz, self.ngf, self.nc, self.ngpu)
         self.netG.apply(weights_init)
-            # apply(fn) => applies fn recursively to every submodule.
-            # typical use includes initializing the parameters of a model
-
         if self.config.netG != '':
             self.netG.load_state_dict(torch.load(self.config.netG))
 
-
-        self.netD = sgan._netD(self.nc, self.ndf, self.num_classes)
+        self.netD = sgan._netD(self.nc, self.ndf, self.num_classes, self.ngpu)
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
         
-    def train(self, real_label=None):
+    def train(self):
         criterion = nn.CrossEntropyLoss()
 
         input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
         noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
         fixed_noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
         label = torch.LongTensor(self.batch_size)
+
         fake_label = self.num_classes
 
         if self.cuda:
@@ -87,7 +86,6 @@ class Trainer(object):
                 for p in self.netD.parameters(): # reset requires_grad
                     p.requires_grad = True # they are set to False below in netG update
 
-
                 # train with real
                 self.netD.zero_grad()   # Clears the gradients of all optimized
                 real_cpu, target = data
@@ -102,24 +100,27 @@ class Trainer(object):
                 inputv = Variable(input)
                 labelv = Variable(target)
 
-
                 output = self.netD(inputv)
-                errD_real = criterion(output, labelv)
+                errD_real = criterion(output, labelv)   # real label과 output을 비교
                 errD_real.backward()
-                D_x = output.data.mean()
-
+                D_x = torch.max(self.netD.softmax(output)[:,:self.num_classes], dim=1)[0].mean()
+                    # D_x : Mean value among the maxes of softmax(real labels).
+                    # It should be close to 1 => D classifies real as real label
 
                 # train with fake
                 noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
-                label.resize_(batch_size).fill_(fake_label) # (batch size, )
+                label.resize_(batch_size).fill_(fake_label)
                 labelv = Variable(label)
 
                 output = self.netD(fake.detach())
                 errD_fake = criterion(output, labelv)
                 errD_fake.backward()
-                D_G_z1 = output.data.mean()  # D(x)
+                D_G_z1 = torch.mean(self.netD.softmax(output)[:,self.num_classes])
+                    # D_G_z1 : Mean value of softmax(fake labels).
+                    # It should be cloas to 1 => D classifies fake as fake
+
                 errD = errD_real + errD_fake
                 optimizerD.step()
 
@@ -133,16 +134,19 @@ class Trainer(object):
                 output = self.netD(fake)
                 errG = criterion(output, labelv)
                 errG.backward()
-                D_G_z2 = output.data.mean() # D(G(z))
+                D_G_z2 = self.netD.softmax(output)[:,self.num_classes].mean()
+                    # D_G_z2 : Mean value of softmax(fake labels)
                 optimizerG.step()
 
                 print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
                       % (epoch, self.niter, i, len(self.data_loader),
                          errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
-                if i % 100 == 0:
+                if epoch == 0 and i == 0:
                     vutils.save_image(real_cpu,
                             '%s/real_samples.png' % self.outf,
                             normalize=True)
+
+                if i % 100 == 0:
                     fake = self.netG(fixed_noise)
                     vutils.save_image(fake.data,
                             '%s/fake_samples_epoch_%03d_step_%03d.png' % (self.outf, epoch,i),
