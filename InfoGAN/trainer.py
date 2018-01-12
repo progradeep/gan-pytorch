@@ -4,7 +4,7 @@ import torch.optim as optim
 import torchvision.utils as vutils
 from torch.autograd import Variable
 
-import models.dcgan as dcgan
+import models.infogan as infogan
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -26,6 +26,11 @@ class Trainer(object):
         self.ndf = int(config.ndf)
         self.cuda = config.cuda
 
+        self.num_classes = int(config.num_classes)
+        self.cat_code = int(config.num_cat)
+        self.cont_code = int(config.num_cont)
+        self.code_size = self.num_classes * self.cat_code + self.cont_code
+
         self.batch_size = config.batch_size
         self.image_size = config.image_size
 
@@ -43,27 +48,37 @@ class Trainer(object):
             self.netG.cuda()
 
     def build_model(self):
-        self.netG = dcgan._netG(self.ngpu, self.nz, self.ngf, self.nc)
+        self.netG = infogan._netG(self.ngpu, self.nz, self.ngf, self.nc, self.code_size)
         self.netG.apply(weights_init)
         if self.config.netG != '':
             self.netG.load_state_dict(torch.load(self.config.netG))
-        self.netD = dcgan._netD(self.ngpu, self.nc, self.ndf)
+        self.netD = infogan._netD(self.ngpu, self.nc, self.ndf, self.code_size)
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
         
     def train(self):
-        criterion = nn.BCELoss()
+        bce = nn.BCELoss()
+        ce = nn.CrossEntropyLoss()
+        mse = nn.MSELoss()
 
         input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
-        noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
+        z = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
+        y = torch.LongTensor(self.batch_size, 1).random_() % 10
+        y_onehot = torch.FloatTensor(self.batch_size, 10)
+        y_onehot.zero_()
+        y_onehot.scatter_(1, y, 1)
+        code_cat = y_onehot
+        code_cont = torch.FloatTensor(self.batch_size, self.cont_code).random_(-1, 1)
+        noise = torch.cat([z, code_cat, code_cont], 1).view(-1, self.nz + self.code_size, 1, 1)
+
         fixed_noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
         label = torch.FloatTensor(self.batch_size)
         real_label = 1
         fake_label = 0
 
         if self.cuda:
-            criterion.cuda()
+            bce.cuda()
             input, label = input.cuda(), label.cuda()
             noise, fixed_noise = noise.cuda(), fixed_noise.cuda()
 
@@ -92,20 +107,20 @@ class Trainer(object):
                 inputv = Variable(input)
                 labelv = Variable(label)
 
-                output = self.netD(inputv)
-                errD_real = criterion(output, labelv)
+                out_d, out_q = self.netD(inputv)
+                errD_real = bce(out_d, labelv)
                 errD_real.backward()
-                D_x = output.data.mean()
+                D_x = out_d.data.mean()
 
                 # train with fake
                 noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
                 labelv = Variable(label.fill_(fake_label))
-                output = self.netD(fake.detach())
-                errD_fake = criterion(output, labelv)
+                out_d, out_q = self.netD(fake.detach())
+                errD_fake = bce(out_d, labelv)
                 errD_fake.backward()
-                D_G_z1 = output.data.mean()
+                D_G_z1 = out_d.data.mean()
                 errD = errD_real + errD_fake
                 optimizerD.step()
 
@@ -116,10 +131,16 @@ class Trainer(object):
                     p.requires_grad = False # to avoid computation
                 self.netG.zero_grad()
                 labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
-                output = self.netD(fake)
-                errG = criterion(output, labelv)
+                out_d, out_q = self.netD(fake)
+                errG = bce(out_d, labelv)
+                '''
+                err = bce(out_d, labelv)
+                err_cat = ce(out_q[:, :self.num_classes * self.cat_code, :])
+                err_cont = mse(out_q[:, self.num_classes * self.cat_code:, :])
+                errG = err + err_cat + err_cont
+                '''
                 errG.backward()
-                D_G_z2 = output.data.mean()
+                D_G_z2 = out_d.data.mean()
                 optimizerG.step()
 
                 print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'

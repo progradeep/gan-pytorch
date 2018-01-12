@@ -1,15 +1,18 @@
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', required=True, help='cifar10 | lsun | imagenet | folder | lfw | fake')
+parser.add_argument('--dataset', required=True, help='mnist ( | cifar10 | lsun | imagenet | folder | lfw | fake )')
 parser.add_argument('--dataroot', required=True, help='path to dataset')
+parser.add_argument('--num_classes', type=int, default = 10, help='number of classes of your dataset') # num of classes
+parser.add_argument('--num_cat', type=int, default = 1, help='number of categorical code') # num of categorical code
+parser.add_argument('--num_cont', type=int, default = 2, help='number of continuous code') # num of continuous code
 parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
 parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
 parser.add_argument('--image_size', type=int, default=64, help='the height / width of the input image to network')
 parser.add_argument('--nc', type=int, default=3, help='input image channels')
-parser.add_argument('--nz', type=int, default=100, help='size of the latent z vector')
-parser.add_argument('--ngf', type=int, default=64)
-parser.add_argument('--ndf', type=int, default=64)
+parser.add_argument('--nz', type=int, required=True, help='size of the latent z vector')
+parser.add_argument('--ngf', type=int, default=28)
+parser.add_argument('--ndf', type=int, default=28)
 parser.add_argument('--niter', type=int, default=25, help='number of epochs to train for')
 parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
