@@ -8,11 +8,15 @@ class _netG(nn.Module):
         self.ngpu = ngpu
         self.main = nn.Sequential(
             # input is Z, going into a convolution
-            nn.ConvTranspose2d(nz + code_size, ngf * 8, 7, 1, 0, bias=False),
+            nn.ConvTranspose2d(nz + code_size, ngf * 8, 1, 1, 0, bias=False),
             nn.BatchNorm2d(ngf * 8),
             nn.ReLU(True),
-            # state size. (ngf*8) x 7 x 7
-            nn.ConvTranspose2d(ngf * 8, ngf * 2, 4, 2, 1, bias=False),
+            # state size. (ngf*8) x 1 x 1
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, 7, 1, 0, bias=False),
+            nn.BatchNorm2d(ngf * 4),
+            nn.ReLU(True),
+            # state size. (ngf*4) x 7 x 7
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
             # state size. (ngf*2) x 14 x 14
@@ -56,6 +60,7 @@ class _netD(nn.Module):
     def __init__(self, ngpu, nc, ndf, code_size):
         super(_netD, self).__init__()
         self.ngpu = ngpu
+        self.ndf = ndf
         self.share = nn.Sequential(
             # input is (nc) x 28 x 28
             nn.Conv2d(nc, ndf*2, 4, 2, 1, bias=False),
@@ -80,7 +85,7 @@ class _netD(nn.Module):
 
         out_d = self.sg(share)
 
-        out_q = share.view(-1, self.ndf*8*7*7)
+        out_q = share.view(-1, self.ndf * 8 * 7 * 7)
         out_q = self.fc(out_q)	
 
         return out_d.squeeze(), out_q.squeeze()

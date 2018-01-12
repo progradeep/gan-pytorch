@@ -34,7 +34,8 @@ class Trainer(object):
         self.batch_size = config.batch_size
         self.image_size = config.image_size
 
-        self.lr = config.lr
+        self.lr_d = config.lr_d
+        self.lr_g = config.lr_g
         self.beta1 = config.beta1
 
         self.niter = config.niter
@@ -62,7 +63,7 @@ class Trainer(object):
         ce = nn.CrossEntropyLoss()
         mse = nn.MSELoss()
 
-        input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
+        input = torch.FloatTensor(self.batch_size, 1, self.image_size, self.image_size)
         z = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
         y = torch.LongTensor(self.batch_size, 1).random_() % 10
         y_onehot = torch.FloatTensor(self.batch_size, 10)
@@ -72,21 +73,28 @@ class Trainer(object):
         code_cont = torch.FloatTensor(self.batch_size, self.cont_code).random_(-1, 1)
         noise = torch.cat([z, code_cat, code_cont], 1).view(-1, self.nz + self.code_size, 1, 1)
 
-        fixed_noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
+        z_ = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
+        fixed_noise = torch.cat([z_, code_cat, code_cont], 1).view(-1, self.nz + self.code_size, 1, 1)
         label = torch.FloatTensor(self.batch_size)
         real_label = 1
         fake_label = 0
 
         if self.cuda:
             bce.cuda()
+            ce.cuda()
+            mse.cuda()
             input, label = input.cuda(), label.cuda()
             noise, fixed_noise = noise.cuda(), fixed_noise.cuda()
 
+            y = y.view(self.batch_size)
+            y = Variable(y.cuda())
+            code_cat = Variable(code_cat.cuda())
+            code_cont = Variable(code_cont.cuda())
         fixed_noise = Variable(fixed_noise)
 
         # setup optimizer
-        optimizerD = optim.Adam(self.netD.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        optimizerG = optim.Adam(self.netG.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        optimizerD = optim.Adam(self.netD.parameters(), lr=self.lr_d, betas=(self.beta1, 0.999))
+        optimizerG = optim.Adam(self.netG.parameters(), lr=self.lr_g, betas=(self.beta1, 0.999))
 
         for epoch in range(self.niter):
             for i, data in enumerate(self.data_loader, 0):
@@ -113,7 +121,8 @@ class Trainer(object):
                 D_x = out_d.data.mean()
 
                 # train with fake
-                noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
+                # TODO
+                noise.resize_(batch_size, self.nz + self.code_size, 1, 1).normal_(0, 1)
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
                 labelv = Variable(label.fill_(fake_label))
@@ -132,13 +141,10 @@ class Trainer(object):
                 self.netG.zero_grad()
                 labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
                 out_d, out_q = self.netD(fake)
-                errG = bce(out_d, labelv)
-                '''
                 err = bce(out_d, labelv)
-                err_cat = ce(out_q[:, :self.num_classes * self.cat_code, :])
-                err_cont = mse(out_q[:, self.num_classes * self.cat_code:, :])
-                errG = err + err_cat + err_cont
-                '''
+                err_cat = ce(out_q[:, :self.num_classes * self.cat_code], y[:out_q.size()[0]])
+                err_cont = mse(out_q[:, self.num_classes * self.cat_code:], code_cont[:out_q.size()[0]])
+                errG = err + (err_cat + err_cont) * 0
                 errG.backward()
                 D_G_z2 = out_d.data.mean()
                 optimizerG.step()
