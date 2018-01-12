@@ -8,11 +8,12 @@ def get_loader(_dataset, dataroot, batch_size, num_workers, image_size, shuffle=
         # folder dataset
         dataset = dset.ImageFolder(root=dataroot,
                                    transform=transforms.Compose([
+                                       transforms.CenterCrop(image_size*2),
                                        transforms.Resize(image_size),
-                                       transforms.CenterCrop(image_size),
                                        transforms.ToTensor(),
                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                    ]))
+
     elif _dataset == 'lsun':
         dataset = dset.LSUN(db_path=dataroot, classes=['bedroom_train'],
                             transform=transforms.Compose([
