@@ -20,6 +20,7 @@ class Trainer(object):
     def __init__(self, config, data_loader):
         self.config = config
         self.data_loader = data_loader
+        self.dataset = config.dataset
 
         self.ngpu = int(config.ngpu)
         self.nc = int(config.nc)
@@ -47,19 +48,19 @@ class Trainer(object):
             self.netG.cuda()
 
     def build_model(self):
-        self.netG = fgan._netG(self.ngpu, self.nz, self.ngf, self.nc)
+        self.netG = fgan._netG(self.ngpu, self.nz)
         self.netG.apply(weights_init)
         if self.config.netG != '':
             self.netG.load_state_dict(torch.load(self.config.netG))
-        self.netD = fgan._netD(self.ngpu, self.nc, self.ndf, self.f_div)
+        self.netD = fgan._netD(self.ngpu, self.f_div)
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
 
     def train(self):
-        input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
-        noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
-        fixed_noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
+        input = torch.FloatTensor(self.batch_size, self.nc , self.image_size, self.image_size)
+        noise = torch.FloatTensor(self.batch_size, self.nz)
+        fixed_noise = torch.FloatTensor(self.batch_size, self.nz).normal_(0, 1)
         ## In f-gan, we don't need labels tensor
 
         if self.cuda:
@@ -91,7 +92,7 @@ class Trainer(object):
                 errD_real = -self.netD(inputv).mean()  # -D
 
                 # train with fake
-                noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
+                noise.resize_(batch_size, self.nz).normal_(0, 1)
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
                 output = self.netD(fake.detach())
@@ -108,17 +109,19 @@ class Trainer(object):
                     p.requires_grad = False  # to avoid computation
                 self.netG.zero_grad()
 
-                noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
+                noise.resize_(batch_size, self.nz).normal_(0, 1)
                 noisev = Variable(noise)
                 fake = self.netG(noisev)
                 output = self.netD(fake)
-                errG = -(self.netD.f_star(output)).mean()  # -f_star(D(G))
+                errG = -self.netD.f_star(output).mean()  # -f_star(D(G))
+
                 errG.backward()
                 optimizerG.step()
 
-                print('[%d/%d][%d/%d] Loss_D_real: %.4f Loss_D_fake: %.4f Loss_G: %.4f'
-                      % (epoch, self.niter, i, len(self.data_loader),
-                         errD_real.data, errD_fake.data, errG.data))
+                if i % 100 == 0:
+                    print('[%d/%d][%d/%d] Loss_D_real: %.4f Loss_D_fake: %.4f Loss_G: %.4f'
+                          % (epoch, self.niter, i, len(self.data_loader),
+                             errD_real.data, errD_fake.data, errG.data))
                 if epoch == 0 and i == 0:
                     vutils.save_image(real_cpu,
                                       '%s/real_samples.png' % self.outf,
@@ -126,7 +129,7 @@ class Trainer(object):
                 if i  == 0:
                     fake = self.netG(fixed_noise)
                     vutils.save_image(fake.data,
-                                      '%s/fake_samples_epoch_%03d_%d.png' % (self.outf, epoch,i),
+                                      '%s/%s_fake_samples_epoch_%03d_%s_%f.png' % (self.outf, self.dataset, epoch, self.f_div, self.lr),
                                       normalize=True)
 
             # do checkpointing
