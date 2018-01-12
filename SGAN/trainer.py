@@ -97,14 +97,14 @@ class Trainer(object):
                     real_cpu = real_cpu.cuda()
                     target = target.cuda()
 
-                input.resize_as_(real_cpu).copy_(real_cpu) # dataloader batchsize만큼 input tensor에 넣기.
+                input.resize_as_(real_cpu).copy_(real_cpu)
                 target.resize_(batch_size)
                 inputv = Variable(input)
                 labelv = Variable(target)
 
 
-                output = self.netD(inputv)  # Discriminator에 input image를 넣고 나온 output
-                errD_real = criterion(output, labelv)   # real label과 output을 비교
+                output = self.netD(inputv)
+                errD_real = criterion(output, labelv)
                 errD_real.backward()
                 D_x = output.data.mean()
 
