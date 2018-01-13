@@ -70,7 +70,7 @@ class Trainer(object):
         y_onehot.zero_()
         y_onehot.scatter_(1, y, 1)
         code_cat = y_onehot
-        code_cont = torch.FloatTensor(self.batch_size, self.cont_code).random_(-1, 1)
+        code_cont = torch.FloatTensor(self.batch_size, self.cont_code).uniform_(-1, 1)
         noise = torch.cat([z, code_cat, code_cont], 1).view(-1, self.nz + self.code_size, 1, 1)
 
         z_ = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
@@ -79,6 +79,7 @@ class Trainer(object):
         real_label = 1
         fake_label = 0
 
+        y = y.view(self.batch_size)
         if self.cuda:
             bce.cuda()
             ce.cuda()
@@ -86,10 +87,13 @@ class Trainer(object):
             input, label = input.cuda(), label.cuda()
             noise, fixed_noise = noise.cuda(), fixed_noise.cuda()
 
-            y = y.view(self.batch_size)
-            y = Variable(y.cuda())
-            code_cat = Variable(code_cat.cuda())
-            code_cont = Variable(code_cont.cuda())
+            y = (y.cuda())
+            code_cat = (code_cat.cuda())
+            code_cont = (code_cont.cuda())
+
+        y = Variable(y)
+        code_cat = Variable(code_cat)
+        code_cont = Variable(code_cont)
         fixed_noise = Variable(fixed_noise)
 
         # setup optimizer
@@ -144,7 +148,7 @@ class Trainer(object):
                 err = bce(out_d, labelv)
                 err_cat = ce(out_q[:, :self.num_classes * self.cat_code], y[:out_q.size()[0]])
                 err_cont = mse(out_q[:, self.num_classes * self.cat_code:], code_cont[:out_q.size()[0]])
-                errG = err + (err_cat + err_cont) * 0
+                errG = err + err_cat + err_cont
                 errG.backward()
                 D_G_z2 = out_d.data.mean()
                 optimizerG.step()
