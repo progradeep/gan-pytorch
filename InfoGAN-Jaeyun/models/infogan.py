@@ -8,26 +8,22 @@ class _netG(nn.Module):
         super(_netG, self).__init__()
         self.ngpu = ngpu
         self.main = nn.Sequential(
-            # input is Z, going into a convolution
-            nn.ConvTranspose2d(nz + 100, ngf * 8, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 8),
+            # input is Z, going into a convolution (MNIST)
+            nn.ConvTranspose2d(nz + 12, ngf * 16, 1, 1, bias=False),
+            nn.BatchNorm2d(ngf * 16),
             nn.ReLU(True),
-            # state size. (ngf*8) x 4 x 4
-            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 4),
-            nn.ReLU(True),
-            # state size. (ngf*4) x 8 x 8
-            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+            # state size. (ngf x 16) x 1 x 1
+            nn.ConvTranspose2d(ngf * 16, ngf * 2, 7, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
-            # state size. (ngf*2) x 16 x 16
-            nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
+            # state size. (ngf x 2) * 7 * 7
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.ReLU(True),
-            # state size. (ngf) x 32 x 32
-            nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
-            nn.Tanh()
-            # state size. (nc) x 64 x 64
+            # state size. (ngf) x 14 x 14
+            nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False),
+            nn.Sigmoid()
+            # state size. (nc) x 28 x 28
         )
 
     def forward(self, input):
@@ -42,22 +38,18 @@ class _netShareDQ(nn.Module):
         super(_netShareDQ, self).__init__()
         self.ngpu = ngpu
         self.main = nn.Sequential(
-            # input is (nc) x 64 x 64
+            # input is (nc) x 28 x 28
             nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf) x 32 x 32
+            nn.LeakyReLU(0.1, inplace=True),
+            # state size. (ndf) x 14 x 14
             nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 2),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*2) x 16 x 16
-            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*4) x 8 x 8
-            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 8),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*8) x 4 x 4
+            nn.LeakyReLU(0.1, inplace=True),
+            # state size. (ndf x 2) x 7 x 7
+            nn.Conv2d(ndf * 2, ndf * 16, 7, bias=False),
+            nn.BatchNorm2d(ndf * 16),
+            nn.LeakyReLU(0.1, inplace=True),
+            # state size. (ndf x 16) x 1 x 1
         )
 
     def forward(self, input):
@@ -73,8 +65,8 @@ class _netD(nn.Module):
         super(_netD, self).__init__()
         self.ngpu = ngpu
         self.main = nn.Sequential(
-            # state size. (ndf*8) x 4 x 4
-            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+            # state size. (ndf x 16) x 1 x 1
+            nn.Conv2d(ndf * 16, 1, 1),
             nn.Sigmoid()
 
         )
@@ -93,42 +85,23 @@ class _netQ(nn.Module):
         super(_netQ, self).__init__()
         self.ngpu = ngpu
 
-        self.conv_1 = nn.Conv2d(ndf * 8, 10, 4, 1, 0, bias=False)
-        self.conv_2 = nn.Conv2d(ndf * 8, 10, 4, 1, 0, bias=False)
-        self.conv_3 = nn.Conv2d(ndf * 8, 10, 4, 1, 0, bias=False)
-        self.conv_4 = nn.Conv2d(ndf * 8, 10, 4, 1, 0, bias=False)
-        self.conv_5 = nn.Conv2d(ndf * 8, 10, 4, 1, 0, bias=False)
-        self.conv_6 = nn.Conv2d(ndf * 8, 10, 4, 1, 0, bias=False)
-        self.conv_7 = nn.Conv2d(ndf * 8, 10, 4, 1, 0, bias=False)
-        self.conv_8 = nn.Conv2d(ndf * 8, 10, 4, 1, 0, bias=False)
-        self.conv_9 = nn.Conv2d(ndf * 8, 10, 4, 1, 0, bias=False)
-        self.conv_10 = nn.Conv2d(ndf * 8, 10, 4, 1, 0, bias=False)
+        self.conv = nn.Conv2d(ndf * 16, ndf * 2, 1, bias=False)
+        self.conv_disc = nn.Conv2d(ndf * 2, 10, 1)
+        self.conv_mu = nn.Conv2d(ndf * 2, 2, 1)
+        self.conv_var = nn.Conv2d(ndf * 2, 2, 1)
 
     def forward(self, input):
-        q_list = []
         if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
-            q_list.append(nn.parallel.data_parallel(self.conv_1, input, range(self.ngpu)))
-            q_list.append(nn.parallel.data_parallel(self.conv_2, input, range(self.ngpu)))
-            q_list.append(nn.parallel.data_parallel(self.conv_3, input, range(self.ngpu)))
-            q_list.append(nn.parallel.data_parallel(self.conv_4, input, range(self.ngpu)))
-            q_list.append(nn.parallel.data_parallel(self.conv_5, input, range(self.ngpu)))
-            q_list.append(nn.parallel.data_parallel(self.conv_6, input, range(self.ngpu)))
-            q_list.append(nn.parallel.data_parallel(self.conv_7, input, range(self.ngpu)))
-            q_list.append(nn.parallel.data_parallel(self.conv_8, input, range(self.ngpu)))
-            q_list.append(nn.parallel.data_parallel(self.conv_9, input, range(self.ngpu)))
-            q_list.append(nn.parallel.data_parallel(self.conv_10, input, range(self.ngpu)))
+            y = nn.parallel.data_parallel(self.conv, input, range(self.ngpu))
+            disc_logits = nn.parallel.data_parallel(self.conv_disc, y, range(self.ngpu))
+            mu = nn.parallel.data_parallel(self.conv_mu, y, range(self.ngpu))
+            var = nn.parallel.data_parallel(self.conv_var, y, range(self.ngpu))
         else:
-            q_list.append(self.conv_1(input).squeeze())
-            q_list.append(self.conv_2(input).squeeze())
-            q_list.append(self.conv_3(input).squeeze())
-            q_list.append(self.conv_4(input).squeeze())
-            q_list.append(self.conv_5(input).squeeze())
-            q_list.append(self.conv_6(input).squeeze())
-            q_list.append(self.conv_7(input).squeeze())
-            q_list.append(self.conv_8(input).squeeze())
-            q_list.append(self.conv_9(input).squeeze())
-            q_list.append(self.conv_10(input).squeeze())
+            y = self.conv(input)
+            disc_logits = self.conv_disc(y).squeeze()
+            mu = self.conv_mu(y).squeeze()
+            var = self.conv_var(y).squeeze().exp()
 
-        return q_list
+        return disc_logits, mu, var
 
 

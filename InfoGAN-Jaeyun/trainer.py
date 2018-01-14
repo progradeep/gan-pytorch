@@ -7,6 +7,15 @@ from torch.autograd import Variable
 
 import models.infogan as infogan
 
+class log_gaussian:
+
+  def __call__(self, x, mu, var):
+
+    logli = -0.5*(var.mul(2*np.pi)+1e-6).log() - \
+            (x-mu).pow(2).div(var.mul(2.0)+1e-6)
+    
+    return logli.sum(1).mean().mul(-1)
+
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -15,18 +24,15 @@ def weights_init(m):
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
 
-def noise_sample(c, noise, bs, nz):
-    idx = []
-    z_list = [noise]
-    for i in range(10):
-        idx.append(np.random.randint(10, size=bs))
-        c = np.zeros((bs, 10))
-        c[range(bs),idx] = 1.0
-        c = torch.Tensor(c).cuda()
-        z_list.append(Variable(c))
-    
-    noise.data.uniform_(-1.0, 1.0)
-    z = torch.cat(z_list, 1).view(-1, nz + 100, 1, 1)
+def noise_sample(dis_cv, con_cv, noisev, bs, nz):
+    idx = np.random.randint(10, size=bs)
+    c = np.zeros((bs, 10))
+    c[range(bs), idx] = 1.0
+
+    dis_cv.data.copy_(torch.Tensor(c))
+    con_cv.data.uniform_(-1.0, 1.0)
+    noisev.data.uniform_(-1.0, 1.0)
+    z = torch.cat([noisev, dis_cv, con_cv], 1).view(-1, nz + 12, 1, 1)
 
     return z, idx
 
@@ -81,44 +87,39 @@ class Trainer(object):
        
     def train(self):
         criterion = nn.BCELoss()
-        criterionQ = nn.CrossEntropyLoss()
+        criterionQ_dis = nn.CrossEntropyLoss()
+        criterionQ_con = log_gaussian()
 
         input = torch.FloatTensor(self.batch_size, self.nc, self.image_size, self.image_size)
         noise = torch.FloatTensor(self.batch_size, self.nz)
-        c = torch.FloatTensor(self.batch_size, 100)
+        dis_c = torch.FloatTensor(self.batch_size, 10)
+        con_c = torch.FloatTensor(self.batch_size, 2)
 
-        fixed_noise = np.zeros((100, self.nz))
-
-        for i in range(10):
-            row = np.random.randn(1, self.nz)
-            row = np.tile(row, (10, 1))
-            fixed_noise[10*i:10*(i+1), :] = row
-
-        fixed_noise = torch.FloatTensor(fixed_noise)
-        
         label = torch.FloatTensor(self.batch_size)
         real_label = 1
         fake_label = 0
         
         noisev = Variable(noise)
-        cv = Variable(c)
-        fixed_noise = Variable(fixed_noise)
+        dis_cv = Variable(dis_c)
+        con_cv = Variable(con_c)
 
         if self.cuda:
             criterion.cuda()
+            criterionQ_dis.cuda()
             input, label = input.cuda(), label.cuda()
-            noisev.data, cv.data, fixed_noise = noisev.data.cuda(), cv.data.cuda(), fixed_noise.cuda()
+            noisev.data, dis_cv.data, con_cv.data = noisev.data.cuda(), dis_cv.data.cuda(), con_cv.data.cuda()
+
+        c = np.linspace(-1, 1, 10).reshape(1, -1)
+        c = np.repeat(c, 10, 0).reshape(-1, 1)
+
+        c1 = np.hstack([c, np.zeros_like(c)])
+        c2 = np.hstack([np.zeros_like(c), c])
 
         idx = np.arange(10).repeat(10)
         one_hot = np.zeros((100, 10))
         one_hot[range(100), idx] = 1
 
-        c_fixed_list = []
-        for i in range(10):
-            c_fixed_i = np.zeros((100, 100))
-            c_fixed_i[:, i*10:(i+1)*10] = one_hot
-            c_fixed_i = torch.FloatTensor(c_fixed_i).cuda()
-            c_fixed_list.append(Variable(c_fixed_i))
+        fixed_noise = torch.Tensor(100, self.nz).uniform_(-1, 1)
 
         # setup optimizer
         optimizerD = optim.Adam([{'params':self.netShareDQ.parameters()}, {'params':self.netD.parameters()}], lr=self.lrD, betas=(self.beta1, 0.999))
@@ -142,7 +143,8 @@ class Trainer(object):
                 label.resize_(batch_size).fill_(real_label)
 
                 noisev.data.resize_(batch_size, self.nz)
-                cv.data.resize_(batch_size, 100)
+                dis_cv.data.resize_(batch_size, 10)
+                con_cv.data.resize_(batch_size, 2)
 
                 inputv = Variable(input)
                 labelv = Variable(label)
@@ -153,7 +155,7 @@ class Trainer(object):
                 D_x = output.data.mean()
 
                 noisev.data = noisev.data.normal_(0, 1)
-                z, idx = noise_sample(cv, noisev, batch_size, self.nz)
+                z, idx = noise_sample(dis_cv, con_cv, noisev, batch_size, self.nz)
 
                 # train with fake
                 fake = self.netG(z)
@@ -177,16 +179,15 @@ class Trainer(object):
                 output = self.netD(shared_output)
                 err = criterion(output, labelv)
                 
-                q_list = self.netQ(shared_output)
+                q_logits, q_mu, q_var = self.netQ(shared_output)
                 
                 class_ = torch.LongTensor(idx).cuda()
                 target = Variable(class_)
-                err_c_list = []
-                for k in range(10):
-                    err_c = criterionQ(q_list[k], target[k])
-                    err_c_list.append(err_c)
 
-                errG = err + torch.mean(err_c)
+                dis_loss = criterionQ_dis(q_logits, target)
+                con_loss = criterionQ_con(con_cv, q_mu, q_var)*0.1
+
+                errG = err + dis_loss + con_loss
 
                 errG.backward()
                 D_G_z2 = output.data.mean()
@@ -199,12 +200,22 @@ class Trainer(object):
                     vutils.save_image(real_cpu,
                             '%s/real_samples.png' % self.outf,
                             nrow=10, normalize=True)
-                    for idx, c_fixed in enumerate(c_fixed_list):
-                        z = torch.cat([fixed_noise, c_fixed], 1).view(-1, self.nz + 100, 1, 1)
-                        fake = self.netG(z)
-                        vutils.save_image(fake.data,
-                                '%s/fake_samples_c%i_epoch_%03d.png' % (self.outf, idx, epoch),
-                                nrow=10, normalize=True)
+                    noisev.data.copy_(fixed_noise)
+                    dis_cv.data.copy_(torch.Tensor(one_hot))
+
+                    con_cv.data.copy_(torch.from_numpy(c1))
+                    z = torch.cat([noisev, dis_cv, con_cv], 1).view(-1, self.nz + 12, 1, 1)
+                    fake = self.netG(z)
+                    vutils.save_image(fake.data,
+                            '%s/fake_samples_c1_epoch_%03d.png' % (self.outf, epoch),
+                            nrow=10)
+
+                    con_cv.data.copy_(torch.from_numpy(c2))
+                    z = torch.cat([noisev, dis_cv, con_cv], 1).view(-1, self.nz + 12, 1, 1)
+                    fake = self.netG(z)
+                    vutils.save_image(fake.data,
+                            '%s/fake_samples_c2_epoch_%03d.png' % (self.outf, epoch),
+                            nrow=10)
 
             # do checkpointing
             torch.save(self.netG.state_dict(), '%s/netG_epoch_%03d.pth' % (self.outf, epoch))

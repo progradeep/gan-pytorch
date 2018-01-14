@@ -1,0 +1,5 @@
+samples
+*.pyc
+SGAN/cifar10
+datasets
+.idea
