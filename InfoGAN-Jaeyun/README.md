@@ -1,1 +1,0 @@
-InfoGAN implementation in pytorch
