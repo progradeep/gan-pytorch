@@ -1,0 +1,27 @@
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--image_path', required=True, help='path to image dataset')
+parser.add_argument('--attribute_path', required=True, help='path to attribute dataset')
+parser.add_argument('--workers', type=int, default=1, help='number of data loading workers')
+parser.add_argument('--batch_size', type=int, default=16, help='input batch size')
+parser.add_argument('--crop_size', type=int, default=178, help='the height / width of the cropped CelebA')
+parser.add_argument('--image_size', type=int, default=128, help='the height / width of the input image to network')
+parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
+parser.add_argument('--na', type=int, default=5, help='number of attributes')
+parser.add_argument('--ngf', type=int, default=64)
+parser.add_argument('--ndf', type=int, default=64)
+parser.add_argument('--niter', type=int, default=20, help='number of epochs to train for')
+parser.add_argument('--niter_decay', type=int, default=10, help='number of epochs after which lr decays')
+parser.add_argument('--lr', type=float, default=0.0001, help='learning rate, default=0.0002')
+parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
+parser.add_argument('--cuda', action='store_true', help='enables cuda')
+parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
+parser.add_argument('--netG', default='', help="path to netG (to continue training)")
+parser.add_argument('--netD', default='', help="path to netD (to continue training)")
+parser.add_argument('--outf', default=None, help='folder to output images and model checkpoints')
+parser.add_argument('--sample_step', type=int, default=1000, help='sample steps')
+parser.add_argument('--checkpoint_step', type=int, default=4000, help='checkpoint steps')
+
+def get_config():
+    return parser.parse_args()
