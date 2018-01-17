@@ -21,7 +21,7 @@ parser.add_argument('--netG', default='', help="path to netG (to continue traini
 parser.add_argument('--netD', default='', help="path to netD (to continue training)")
 parser.add_argument('--outf', default=None, help='folder to output images and model checkpoints')
 parser.add_argument('--sample_step', type=int, default=1000, help='sample steps')
-parser.add_argument('--checkpoint_step', type=int, default=4000, help='checkpoint steps')
+parser.add_argument('--checkpoint_step', type=int, default=6000, help='checkpoint steps')
 
 def get_config():
     return parser.parse_args()

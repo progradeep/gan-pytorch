@@ -45,10 +45,12 @@ class Trainer(object):
         self.netG.apply(weights_init)
         if self.config.netG != '':
             self.netG.load_state_dict(torch.load(self.config.netG))
+            print('restored {0}'.format(self.config.netG))
         self.netD = stargan._netD(self.ngpu, self.na, self.ndf)
         self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
+            print('restored {0}'.format(self.config.netD))
 
         self.optimizerG = optim.Adam(self.netG.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.optimizerD = optim.Adam(self.netD.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
