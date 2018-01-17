@@ -221,7 +221,7 @@ class Trainer(object):
                     print('''[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f Loss_KL: %.4f
                         Loss_real: %.4f Loss_wrong:%.4f Loss_fake %.4f
                         '''
-                        % (epoch, self.niter, i, len(data_loader),
+                        % (epoch, self.niter, i, len(self.data_loader),
                             errD.data[0], errG.data[0], kl_loss.data[0],
                             errD_real, errD_wrong, errD_fake))
             if epoch % self.snapshot_interval == 0:
