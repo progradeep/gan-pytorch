@@ -1,5 +1,7 @@
 samples
 *.pyc
 SGAN/cifar10
+StackGAN/temp_config
+StackGAN/pretrained_models
 datasets
 .idea
