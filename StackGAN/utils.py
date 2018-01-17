@@ -77,8 +77,8 @@ def compute_generator_loss(netD, fake_imgs, real_labels, conditions, gpus):
     return errD_fake
 
 #############################
-def save_img_results(data_img, fake, epoch, image_dir):
-    num = cfg.VIS_COUNT
+def save_img_results(data_img, fake, epoch, image_dir, num):
+   
     fake = fake[0:num]
     # data_img is changed to [0,1]
     if data_img is not None:

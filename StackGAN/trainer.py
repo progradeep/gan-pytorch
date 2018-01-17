@@ -49,9 +49,23 @@ class Trainer(object):
         self.r_num = int(config.r_num)
 
         self.cuda = config.cuda
+        
+        self.training = config.training
+        self.stage = config.stage
 
         self.batch_size = config.batch_size
         self.image_size = config.image_size
+        
+        if not self.training:
+            self.stage = 2
+
+        if self.stage == 1:
+            self.batch_size = 128
+            self.image_size = 64
+
+        else:
+            self.batch_size = 40
+            self.image_size = 256
 
         self.lrG = config.lrG
         self.lrD = config.lrD
@@ -60,10 +74,12 @@ class Trainer(object):
 
         self.niter = config.niter
 
+        self.vis_count = config.vis_count
+        self.snapshot_interval = config.snapshot_interval
+
         self.outf = config.outf
 
-        self.training = config.training
-        self.stage = config.stage
+        self.coeff_KL = config.coeff_KL
 
         if self.training:
             self.model_dir = os.path.join(self.outf, 'Model')
@@ -72,8 +88,6 @@ class Trainer(object):
             mkdir_p(self.model_dir)
             mkdir_p(self.image_dir)
             mkdir_p(self.log_dir)
-
-        self.snapshot_interval = config.snapshot_interval
 
     # ############# For training stageI GAN #############
     def load_network_stageI(self):
@@ -223,7 +237,7 @@ class Trainer(object):
                      Loss_real: %.4f Loss_wrong:%.4f Loss_fake %.4f
                      Total Time: %.2fsec
                   '''
-                  % (epoch, self.max_epoch, i, len(data_loader),
+                  % (epoch, self.niter, i, len(data_loader),
                      errD.data[0], errG.data[0], kl_loss.data[0],
                      errD_real, errD_wrong, errD_fake, (end_t - start_t)))
             if epoch % self.snapshot_interval == 0:
