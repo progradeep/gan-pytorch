@@ -56,17 +56,6 @@ class Trainer(object):
         self.batch_size = config.batch_size
         self.image_size = config.image_size
         
-        if not self.training:
-            self.stage = 2
-
-        if self.stage == 1:
-            self.batch_size = 128
-            self.image_size = 64
-
-        else:
-            self.batch_size = 40
-            self.image_size = 256
-
         self.lrG = config.lrG
         self.lrD = config.lrD
         self.lr_decay_step = config.lr_decay_step
@@ -82,12 +71,10 @@ class Trainer(object):
         self.coeff_KL = config.coeff_KL
 
         if self.training:
-            self.model_dir = os.path.join(self.outf, 'Model')
-            self.image_dir = os.path.join(self.outf, 'Image')
-            self.log_dir = os.path.join(self.outf, 'Log')
+            self.model_dir = os.path.join(self.outf, 'models')
+            self.image_dir = os.path.join(self.outf, 'images')
             mkdir_p(self.model_dir)
             mkdir_p(self.image_dir)
-            mkdir_p(self.log_dir)
 
     # ############# For training stageI GAN #############
     def load_network_stageI(self):
@@ -174,7 +161,6 @@ class Trainer(object):
                                 betas=(self.beta1, 0.999))
         count = 0
         for epoch in range(self.niter):
-            start_t = time.time()
             if epoch % self.lr_decay_step == 0 and epoch > 0:
                 self.lrG *= 0.5
                 for param_group in optimizerG.param_groups:
@@ -229,17 +215,15 @@ class Trainer(object):
                     inputs = (txt_embedding, fixed_noise)
                     lr_fake, fake, _, _ = \
                         nn.parallel.data_parallel(netG, inputs, range(self.ngpu))
-                    save_img_results(real_img_cpu, fake, epoch, self.image_dir)
+                    save_img_results(real_img_cpu, fake, epoch, self.image_dir, self.vis_count)
                     if lr_fake is not None:
-                        save_img_results(None, lr_fake, epoch, self.image_dir)
-            end_t = time.time()
-            print('''[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f Loss_KL: %.4f
-                     Loss_real: %.4f Loss_wrong:%.4f Loss_fake %.4f
-                     Total Time: %.2fsec
-                  '''
-                  % (epoch, self.niter, i, len(data_loader),
-                     errD.data[0], errG.data[0], kl_loss.data[0],
-                     errD_real, errD_wrong, errD_fake, (end_t - start_t)))
+                        save_img_results(None, lr_fake, epoch, self.image_dir, self.vis_count)
+                    print('''[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f Loss_KL: %.4f
+                        Loss_real: %.4f Loss_wrong:%.4f Loss_fake %.4f
+                        '''
+                        % (epoch, self.niter, i, len(data_loader),
+                            errD.data[0], errG.data[0], kl_loss.data[0],
+                            errD_real, errD_wrong, errD_fake))
             if epoch % self.snapshot_interval == 0:
                 save_model(netG, netD, epoch, self.model_dir)
         #

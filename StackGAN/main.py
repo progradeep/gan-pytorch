@@ -26,6 +26,17 @@ def main(config):
     if torch.cuda.is_available() and not config.cuda:
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
+    if not config.training:
+        config.stage = 2
+
+    if config.stage == 1:
+        config.batch_size = 128
+        config.image_size = 64
+
+    else:
+        config.batch_size = 40
+        config.image_size = 256
+
     if config.training:
         data_loader = get_loader(_dataset=config.dataset, dataroot=config.dataroot, batch_size=config.batch_size,
                                     num_workers=int(config.workers), image_size=config.image_size)

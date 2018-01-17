@@ -1,6 +1,6 @@
 samples
 *.pyc
 .idea
+
 SGAN/cifar10
-StackGAN/pretrained_models
 datasets
