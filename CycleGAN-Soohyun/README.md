@@ -5,5 +5,6 @@ If your own dataset:
     └── data
         ├── A
         └── B
+
 Usage:
     python main.py --dataset [dataset name] --dataroot [path to your dataset] --cuda
