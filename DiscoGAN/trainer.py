@@ -181,7 +181,6 @@ class Trainer(object):
                 continue
 
             x_A, x_B = self._get_variable(x_A), self._get_variable(x_B)
-
             batch_size = x_A.size(0)
             real_tensor.data.resize_(batch_size).fill_(real_label)
             fake_tensor.data.resize_(batch_size).fill_(fake_label)

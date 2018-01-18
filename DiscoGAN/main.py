@@ -2,7 +2,7 @@ import torch
 
 from trainer import Trainer
 from config import get_config
-from data_loader import get_loader
+from data_loader import get_loader, get_celebA_loader
 from utils import prepare_dirs_and_logger, save_config
 
 def main(config):
@@ -22,9 +22,15 @@ def main(config):
             data_path = config.test_data_path
         batch_size = config.sample_per_image
 
-    a_data_loader, b_data_loader = get_loader(
-            data_path, batch_size, config.input_scale_size,
-            config.num_worker, config.skip_pix2pix_processing)
+    if config.dataset == 'celebA':
+        a_data_loader, b_data_loader = get_celebA_loader(
+                data_path, batch_size, config.input_scale_size, config.style_A, config.style_B,
+                config.constraint, config.constraint_type, config.num_worker, config.skip_pix2pix_processing)
+    else:
+        a_data_loader, b_data_loader = get_loader(
+                data_path, batch_size, config.input_scale_size,
+                config.num_worker, config.skip_pix2pix_processing)
+
 
     trainer = Trainer(config, a_data_loader, b_data_loader)
 
