@@ -83,6 +83,7 @@ class Trainer(object):
         if self.cuda:
             MSE_loss.cuda(), L1_loss.cuda()
 
+        # fixed images
         fixed_a = []
         fixed_b = []
         for i, (real_a, real_b) in enumerate(zip(self.train_loader_A, self.train_loader_B)):
@@ -170,6 +171,7 @@ class Trainer(object):
                          errD_A.data[0], errD_B.data[0], errG_A.data[0], errG_B.data[0],
                          cycle_loss_A.data[0], cycle_loss_B.data[0]))
 
+                # save images
                 if (i + 1) % self.sample_step == 0:
                     # a to b
                     fake_image_list_a = [fixed_a]
@@ -190,6 +192,7 @@ class Trainer(object):
                                       % (self.outf, epoch + 1, i + 1),
                                       normalize=True, nrow=1, padding=0)
 
+                # checkpoint
                 if (i + 1) % self.checkpoint_step == 0:
                     torch.save(self.netG_AB.state_dict(), '%s/netG_AB_epoch_%03d_step_%03d.pth' % (self.outf, epoch + 1, i + 1))
                     torch.save(self.netG_BA.state_dict(), '%s/netG_BA_epoch_%03d_step_%03d.pth' % (self.outf, epoch + 1, i + 1))
