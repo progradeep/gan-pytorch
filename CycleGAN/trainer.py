@@ -59,7 +59,7 @@ class Trainer(object):
     def load_model(self):
         print("[*] Load models from {}...".format(self.outf))
 
-        paths = glob(os.path.join(self.outf, 'G_AB_*.pth'))
+        paths = glob(os.path.join(self.outf, 'net*.pth'))
         paths.sort()
 
         if len(paths) == 0:
@@ -230,9 +230,9 @@ class Trainer(object):
                     save_imgs(realA, fakeB, cycleA, realB, fakeA, cycleB, self.outf, epoch, step)
 
                 if step% self.checkpoint_step == 0 and step != 0:
-                    torch.save(self.netG_AB.state_dict(), '%s/netG_A_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
-                    torch.save(self.netD_A.state_dict(), '%s/netD_A_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
-                    torch.save(self.netG_BA.state_dict(), '%s/netG_B_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
-                    torch.save(self.netD_B.state_dict(), '%s/netD_B_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
+                    torch.save(self.netG_AB.state_dict(), '%s/netG_A_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                    torch.save(self.netD_A.state_dict(), '%s/netD_A_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                    torch.save(self.netG_BA.state_dict(), '%s/netG_B_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                    torch.save(self.netD_B.state_dict(), '%s/netD_B_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
                     print("Saved checkpoint")
 
