@@ -26,10 +26,7 @@ def main(config):
     if torch.cuda.is_available() and not config.cuda:
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
-    data_loader = get_loader(_dataset=config.dataset, dataroot=config.dataroot, batch_size=config.batch_size,
-                                num_workers=int(config.workers), image_size=config.image_size)
-
-    trainer = Trainer(config, data_loader)
+    trainer = Trainer(config)
     trainer.train()
 
 if __name__ == "__main__":

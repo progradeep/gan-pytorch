@@ -3,24 +3,28 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils as vutils
 from torch.autograd import Variable
+from data_loader import get_loader
 
-import models.dcgan as dcgan
+import models.pix2pix as pix2pix
 
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
         m.weight.data.normal_(0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
+    elif classname.find('BatchNorm') != -1 or classname.find('InstanceNorm2d') != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
 
 class Trainer(object):
-    def __init__(self, config, data_loader):
+    def __init__(self, config):
         self.config = config
-        self.data_loader = data_loader
+        self.dataroot = config.dataroot
+        self.workers = config.workers
 
         self.ngpu = int(config.ngpu)
         self.nc = int(config.nc)
+        self.input_nc = int(config.input_nc)
+        self.output_nc = int(config.output_nc)
         self.nz = int(config.nz)
         self.ngf = int(config.ngf)
         self.ndf = int(config.ndf)
@@ -36,6 +40,8 @@ class Trainer(object):
 
         self.outf = config.outf
 
+        self.lamb = config.lamb
+
         self.build_model()
 
         if self.cuda:
@@ -43,96 +49,96 @@ class Trainer(object):
             self.netG.cuda()
 
     def build_model(self):
-        self.netG = dcgan._netG(self.ngpu, self.nz, self.ngf, self.nc)
-        self.netG.apply(weights_init)
+        self.netG = pix2pix.define_G(self.input_nc, self.output_nc, self.ngf, 'batch', False, [])
+        self.netD = pix2pix.define_D(self.input_nc + self.output_nc, self.ndf, 'batch', False, [])
         if self.config.netG != '':
             self.netG.load_state_dict(torch.load(self.config.netG))
-        self.netD = dcgan._netD(self.ngpu, self.nc, self.ndf)
-        self.netD.apply(weights_init)
         if self.config.netD != '':
             self.netD.load_state_dict(torch.load(self.config.netD))
+        print('---------- Networks initialized -------------')
+        pix2pix.print_network(self.netG)
+        pix2pix.print_network(self.netD)
+        print('---------------------------------------------')
         
     def train(self):
-        criterion = nn.BCELoss()
+        train_data_loader = get_loader(dataroot=self.dataroot + "/train", batch_size=self.batch_size,
+                                 num_workers=int(self.workers), shuffle = True)
+        test_data_loader = get_loader(dataroot=self.dataroot + "/test", batch_size=self.batch_size,
+                                       num_workers=int(self.workers), shuffle = False)
 
-        input = torch.FloatTensor(self.batch_size, 3, self.image_size, self.image_size)
-        noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1)
-        fixed_noise = torch.FloatTensor(self.batch_size, self.nz, 1, 1).normal_(0, 1)
-        label = torch.FloatTensor(self.batch_size)
-        real_label = 1
-        fake_label = 0
+        criterionGAN = pix2pix.GANLoss()
+        criterionL1 = nn.L1Loss()
+        criterionMSE = nn.MSELoss()
+
+        real_a = torch.FloatTensor(self.batch_size, self.input_nc, 256, 256)
+        real_b = torch.FloatTensor(self.batch_size, self.output_nc, 256, 256)
 
         if self.cuda:
-            criterion.cuda()
-            input, label = input.cuda(), label.cuda()
-            noise, fixed_noise = noise.cuda(), fixed_noise.cuda()
+            criterionGAN = criterionGAN.cuda()
+            criterionL1 = criterionL1.cuda()
+            criterionMSE = criterionMSE.cuda()
+            real_a = real_a.cuda()
+            real_b = real_b.cuda()
 
-        fixed_noise = Variable(fixed_noise)
+        real_a = Variable(real_a)
+        real_b = Variable(real_b)
 
         # setup optimizer
         optimizerD = optim.Adam(self.netD.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         optimizerG = optim.Adam(self.netG.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
 
         for epoch in range(self.niter):
-            for i, data in enumerate(self.data_loader, 0):
+
+            for iteration, batch in enumerate(train_data_loader, 1):
+                # forward
+                real_a_cpu, real_b_cpu = batch[0], batch[1]
+                real_a.data.resize_(real_a_cpu.size()).copy_(real_a_cpu)
+                real_b.data.resize_(real_b_cpu.size()).copy_(real_b_cpu)
+                fake_b = self.netG(real_a)
+
                 ############################
-                # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+                # (1) Update D network: maximize log(D(x,y)) + log(1 - D(x,G(x)))
                 ###########################
-                for p in self.netD.parameters(): # reset requires_grad
-                    p.requires_grad = True # they are set to False below in netG update
 
-                # train with real
-                self.netD.zero_grad()
-                real_cpu, _ = data
-                batch_size = real_cpu.size(0)
-                if self.cuda:
-                    real_cpu = real_cpu.cuda()
-                input.resize_as_(real_cpu).copy_(real_cpu)
-                label.resize_(batch_size).fill_(real_label)
-                inputv = Variable(input)
-                labelv = Variable(label)
-
-                output = self.netD(inputv)
-                errD_real = criterion(output, labelv)
-                errD_real.backward()
-                D_x = output.data.mean()
+                optimizerD.zero_grad()
 
                 # train with fake
-                noise.resize_(batch_size, self.nz, 1, 1).normal_(0, 1)
-                noisev = Variable(noise)
-                fake = self.netG(noisev)
-                labelv = Variable(label.fill_(fake_label))
-                output = self.netD(fake.detach())
-                errD_fake = criterion(output, labelv)
-                errD_fake.backward()
-                D_G_z1 = output.data.mean()
-                errD = errD_real + errD_fake
+                fake_ab = torch.cat((real_a, fake_b), 1)
+                pred_fake = self.netD.forward(fake_ab.detach())
+                loss_d_fake = criterionGAN(pred_fake, False)
+
+                # train with real
+                real_ab = torch.cat((real_a, real_b), 1)
+                pred_real = self.netD.forward(real_ab)
+                loss_d_real = criterionGAN(pred_real, True)
+
+                # Combined loss
+                loss_d = (loss_d_fake + loss_d_real) * 0.5
+
+                loss_d.backward()
+
                 optimizerD.step()
 
                 ############################
-                # (2) Update G network: maximize log(D(G(z)))
-                ###########################
-                for p in self.netD.parameters():
-                    p.requires_grad = False # to avoid computation
-                self.netG.zero_grad()
-                labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
-                output = self.netD(fake)
-                errG = criterion(output, labelv)
-                errG.backward()
-                D_G_z2 = output.data.mean()
+                # (2) Update G network: maximize log(D(x,G(x))) + L1(y,G(x))
+                ##########################
+                optimizerG.zero_grad()
+                # First, G(A) should fake the discriminator
+                fake_ab = torch.cat((real_a, fake_b), 1)
+                pred_fake = self.netD.forward(fake_ab)
+                loss_g_gan = criterionGAN(pred_fake, True)
+
+                # Second, G(A) = B
+                loss_g_l1 = criterionL1(fake_b, real_b) * self.lamb
+
+                loss_g = loss_g_gan + loss_g_l1
+
+                loss_g.backward()
+
                 optimizerG.step()
 
-                print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
-                      % (epoch, self.niter, i, len(self.data_loader),
-                         errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
-                if i % 100 == 0:
-                    vutils.save_image(real_cpu,
-                            '%s/real_samples.png' % self.outf,
-                            normalize=True)
-                    fake = self.netG(fixed_noise)
-                    vutils.save_image(fake.data,
-                            '%s/fake_samples_epoch_%03d.png' % (self.outf, epoch),
-                            normalize=True)
+                print("===> Epoch[{}]({}/{}): Loss_D: {:.4f} Loss_G: {:.4f}".format(
+                    epoch, iteration, len(train_data_loader), loss_d.data[0], loss_g.data[0]))
 
             # do checkpointing
             torch.save(self.netG.state_dict(), '%s/netG_epoch_%03d.pth' % (self.outf, epoch))
