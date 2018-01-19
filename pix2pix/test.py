@@ -12,7 +12,7 @@ from models import pix2pix
 # Testing settings
 parser = argparse.ArgumentParser(description='pix2pix-PyTorch-implementation')
 
-parser.add_argument('--model', type=str, default='samples/netG_epoch_200.pth', help='model file to use')
+parser.add_argument('--model', type=str, default='samples/netG_epoch_199.pth', help='model file to use')
 parser.add_argument('--cuda', action='store_true', help='use cuda')
 opt = parser.parse_args()
 
@@ -40,6 +40,6 @@ for image_name in image_filenames:
     out = netG(input)
     out = out.cpu()
     out_img = out.data[0]
-    if not os.path.exists("datasets/result"):
-        os.mkdir("datasets/result")
-    save_img(out_img, "datasets/result/{}".format(image_name))
+    if not os.path.exists("facades/result"):
+        os.mkdir("facades/result")
+    save_img(out_img, "facades/result/{}".format(image_name))
