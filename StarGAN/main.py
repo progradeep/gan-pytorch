@@ -31,7 +31,11 @@ def main(config):
                              mode=config.mode)
 
     trainer = Trainer(config, data_loader)
-    trainer.train()
+
+    if config.mode == 'train':
+        trainer.train()
+    elif config.mode == 'test':
+        trainer.test()
 
 if __name__ == "__main__":
     config = get_config()

@@ -218,3 +218,21 @@ class Trainer(object):
                     param_group['lr'] = self.lr
                 for param_group in self.optimizerD.param_groups:
                     param_group['lr'] = self.lr
+
+    def test(self):
+        self.netG.load_state_dict(torch.load(self.config.netG))
+        self.netG.eval()
+
+        for i, (real_x, org_c) in enumerate(self.data_loader):
+            real_x = self.to_var(real_x, volatile=True)
+
+            target_c_list = self.make_celeb_labels(org_c)
+
+            fake_image_list = [real_x]
+            for target_c in target_c_list:
+                fake_image_list.append(self.netG(real_x, target_c))
+            fake_images = torch.cat(fake_image_list, dim=3)
+            vutils.save_image(fake_images.data,
+                              '%s/test_images_%d.png'
+                              % (self.outf, i + 1),
+                              normalize=True, nrow=1, padding=0)
