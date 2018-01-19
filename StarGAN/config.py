@@ -20,7 +20,7 @@ parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
 parser.add_argument('--netG', default='', help="path to netG (to continue training)")
 parser.add_argument('--netD', default='', help="path to netD (to continue training)")
 parser.add_argument('--outf', default=None, help='folder to output images and model checkpoints')
-parser.add_argument('--sample_step', type=int, default=1000, help='sample steps')
+parser.add_argument('--sample_step', type=int, default=2000, help='sample steps')
 parser.add_argument('--checkpoint_step', type=int, default=6000, help='checkpoint steps')
 
 def get_config():
