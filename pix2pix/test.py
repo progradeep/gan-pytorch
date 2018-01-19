@@ -20,7 +20,7 @@ opt = parser.parse_args()
 netG = pix2pix.define_G(3, 3, 64, 'batch', False, [])
 netG.load_state_dict(torch.load(opt.model))
 
-image_dir = "datasets/test/a/"
+image_dir = "facades/test/a/"
 image_filenames = [x for x in os.listdir(image_dir) if is_image_file(x)]
 
 transform_list = [transforms.ToTensor(),

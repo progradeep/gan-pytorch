@@ -3,7 +3,7 @@ import os
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default="facades", help='facades')
-parser.add_argument('--dataroot', default=os.path.split(os.getcwd())[0] + '/pix2pix/datasets', help='path to dataset')
+parser.add_argument('--dataroot', default=os.path.split(os.getcwd())[0] + '/pix2pix/facades', help='path to dataset')
 parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
 parser.add_argument('--batch_size', type=int, default=1, help='input batch size')
 parser.add_argument('--image_size', type=int, default=64, help='the height / width of the input image to network')
