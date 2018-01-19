@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
-import itertools, time
+import itertools, time, os
+from glob import glob
 from utils import save_imgs
 import models.cyclegan as cyclegan
 
@@ -50,25 +51,52 @@ class Trainer(object):
         self.build_model()
 
         if self.cuda:
-            self.netG_A.cuda()
+            self.netG_AB.cuda()
             self.netD_A.cuda()
-            self.netG_B.cuda()
+            self.netG_BA.cuda()
             self.netD_B.cuda()
+
+    def load_model(self):
+        print("[*] Load models from {}...".format(self.outf))
+
+        paths = glob(os.path.join(self.outf, 'G_AB_*.pth'))
+        paths.sort()
+
+        if len(paths) == 0:
+            print("[!] No checkpoint found in {}...".format(self.outf))
+            return
+
+        epochs = [int(os.path.basename(path.split('.')[0].split('_')[-2].split('-')[-1])) for path in paths]
+        self.start_epoch = str(max(epochs))
+        steps = [int(os.path.basename(path.split('.')[0].split('_')[-1].split('-')[-1])) for path in paths]
+        self.start_step = str(max(steps))
+
+
+
+        G_AB_filename = '{}/netG_A_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+        G_BA_filename = '{}/netG_B_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+        D_A_filename = '{}/netD_A_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+        D_B_filename = '{}/netD_B_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+
+
+        self.netG_AB.load_state_dict(torch.load(G_AB_filename))
+        self.netG_BA.load_state_dict(torch.load(G_BA_filename))
+        self.netD_A.load_state_dict(torch.load(D_A_filename))
+        self.netD_B.load_state_dict(torch.load(D_B_filename))
+
+
+        print("[*] Model loaded: {}".format(G_AB_filename))
 
 
     def build_model(self):
-        self.netG_A = cyclegan._netG(self.ngpu, self.ngf,
-                                     self.input_nc, self.output_nc)
-        self.netG_A.apply(weights_init)
+        self.netG_AB = cyclegan._netG(self.ngpu, self.ngf,
+                                      self.input_nc, self.output_nc)
+        self.netG_AB.apply(weights_init)
 
-        self.netG_B = cyclegan._netG(self.ngpu, self.ngf,
-                                     self.input_nc, self.output_nc)
-        self.netG_B.apply(weights_init)
+        self.netG_BA = cyclegan._netG(self.ngpu, self.ngf,
+                                      self.input_nc, self.output_nc)
+        self.netG_BA.apply(weights_init)
 
-        if self.config.netG_A != '':
-            self.netG_A.load_state_dict(torch.load(self.config.netG_A))
-        if self.config.netG_B != '':
-            self.netG_B.load_state_dict(torch.load(self.config.netG_B))
 
         self.netD_A = cyclegan._netD(self.ngpu, self.ndf, self.input_nc)
         self.netD_A.apply(weights_init)
@@ -76,10 +104,9 @@ class Trainer(object):
         self.netD_B = cyclegan._netD(self.ngpu, self.ndf, self.input_nc)
         self.netD_B.apply(weights_init)
 
-        if self.config.netD_A != '':
-            self.netD_A.load_state_dict(torch.load(self.config.netD_A))
-        if self.config.netD_B != '':
-            self.netD_B.load_state_dict(torch.load(self.config.netD_B))
+        if self.config.model_path != '':
+            self.load_model()
+
 
     def train(self):
         MSELoss = nn.MSELoss()
@@ -92,7 +119,7 @@ class Trainer(object):
         # setup optimizer
         optimizerD_A = optim.Adam(self.netD_A.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
         optimizerD_B = optim.Adam(self.netD_B.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
-        optimizerG = optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()), lr=self.lr, betas=(self.beta1, self.beta2))
+        optimizerG = optim.Adam(itertools.chain(self.netG_AB.parameters(), self.netG_BA.parameters()), lr=self.lr, betas=(self.beta1, self.beta2))
 
         test_loader_A, test_loader_B = iter(self.test_loader_A), iter(self.test_loader_B)
 
@@ -114,25 +141,25 @@ class Trainer(object):
                 for p in self.netD_B.parameters():
                     p.requires_grad = False
 
-                self.netG_A.zero_grad()
-                self.netG_B.zero_grad()
+                self.netG_AB.zero_grad()
+                self.netG_BA.zero_grad()
 
                 # GAN loss: D_A(G_A(A))
-                fakeB = self.netG_A(realA)
+                fakeB = self.netG_AB(realA)
                 output = self.netD_A(fakeB)
                 loss_G_A = MSELoss(output, Variable(torch.ones(output.size()).cuda()))
 
                 # GAN loss: D_B(G_B(B))
-                fakeA = self.netG_B(realA)
-                output = self.netD_B(fakeB)
+                fakeA = self.netG_BA(realB)
+                output = self.netD_B(fakeA)
                 loss_G_B = MSELoss(output, Variable(torch.ones(output.size()).cuda()))
 
                 # Forward cycle loss: A <-> G_B(G_A(A))
-                cycleA = self.netG_B(fakeB)
+                cycleA = self.netG_BA(fakeB)
                 loss_cycle_A = L1loss(cycleA, realA) * self.cycle_lambda
 
                 # Backward cycle loss: B <-> G_A(G_B(B))
-                cycleB = self.netG_A(fakeA)
+                cycleB = self.netG_AB(fakeA)
                 loss_cycle_B = L1loss(cycleB, realB) * self.cycle_lambda
 
                 # Combined Generator loss
@@ -193,19 +220,19 @@ class Trainer(object):
                     realB = test_loader_B.next()
 
                     realA = Variable(realA.cuda(), volatile=True)
-                    fakeB = self.netG_A(realA)
-                    cycleA = self.netG_B(fakeB)
+                    fakeB = self.netG_AB(realA)
+                    cycleA = self.netG_BA(fakeB)
 
                     realB = Variable(realB.cuda(), volatile=True)
-                    fakeA = self.netG_B(realB)
-                    cycleB = self.netG_A(fakeA)
+                    fakeA = self.netG_BA(realB)
+                    cycleB = self.netG_AB(fakeA)
 
                     save_imgs(realA, fakeB, cycleA, realB, fakeA, cycleB, self.outf, epoch, step)
 
                 if step% self.checkpoint_step == 0 and step != 0:
-                    torch.save(self.netG_A.state_dict(), '%s/netG_A_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
+                    torch.save(self.netG_AB.state_dict(), '%s/netG_A_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
                     torch.save(self.netD_A.state_dict(), '%s/netD_A_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
-                    torch.save(self.netG_B.state_dict(), '%s/netG_B_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
+                    torch.save(self.netG_BA.state_dict(), '%s/netG_B_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
                     torch.save(self.netD_B.state_dict(), '%s/netD_B_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
                     print("Saved checkpoint")
 

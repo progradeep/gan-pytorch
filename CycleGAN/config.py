@@ -22,10 +22,7 @@ parser.add_argument('--decay_epoch', type=int, default=100, help='learning rate 
 parser.add_argument('--cycle_lambda', type=int, default=10, help='lambda for the cycle loss')
 parser.add_argument('--cuda', action='store_true', help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
-parser.add_argument('--netG_A', default='', help="path to netG_A (to continue training)")
-parser.add_argument('--netD_A', default='', help="path to netD_A (to continue training)")
-parser.add_argument('--netG_B', default='', help="path to netG_B (to continue training)")
-parser.add_argument('--netD_B', default='', help="path to netD_B (to continue training)")
+parser.add_argument('--model_path', default='', help="path to saved models (to continue training)")
 parser.add_argument('--outf', default=None, help='folder to output images and model checkpoints')
 
 def get_config():
