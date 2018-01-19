@@ -1,52 +1,20 @@
-import os
-import numpy as np
-import scipy.misc as misc
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 import itertools, time
+from utils import save_imgs
 import models.cyclegan as cyclegan
-
 
 
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
-        m.weight.data.normal_(0.0, 0.02)  # mean = 0.0, st = 0.02
+        m.weight.data.normal_(0.0, 0.02)
 
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
-
-
-def save_imgs(realA, fakeB, cycleA, realB, fakeA, cycleB, save_dir, epoch,step):
-    realA = realA.squeeze()
-    realB = realB.squeeze()
-    fakeA = fakeA.squeeze()
-    fakeB = fakeB.squeeze()
-    cycleA = cycleA.squeeze()
-    cycleB = cycleB.squeeze()
-
-    realA = realA.data.cpu().numpy()
-    fakeB = fakeB.data.cpu().numpy()
-    cycleA = cycleA.data.cpu().numpy()
-    realB = realB.data.cpu().numpy()
-    fakeA = fakeA.data.cpu().numpy()
-    cycleB = cycleB.data.cpu().numpy()
-
-    imgs = ((realA.transpose(1,2,0)+1)/2, (fakeB.transpose(1, 2, 0) + 1 )/ 2,(cycleA.transpose(1, 2, 0) + 1) / 2,
-            (realB.transpose(1, 2, 0) + 1) / 2,(fakeA.transpose(1, 2, 0) + 1) / 2, (cycleB.transpose(1, 2, 0) + 1) / 2)
-
-    p = os.path.join(save_dir, "epoch-%s_step-%s.png" % (epoch,step))
-
-    def save_concat_images(imgs, img_path):
-        concated = np.concatenate(imgs, axis=1)
-        misc.imsave(img_path, concated)
-
-    save_concat_images(imgs, img_path=p)
-
-
 
 
 class Trainer(object):
@@ -76,6 +44,8 @@ class Trainer(object):
         self.cycle_lambda = config.cycle_lambda
 
         self.outf = config.outf
+        self.sample_step = config.sample_step
+        self.checkpoint_step = config.checkpoint_step
 
         self.build_model()
 
@@ -133,8 +103,7 @@ class Trainer(object):
                 optimizerG.param_groups[0]['lr'] -= self.lr / (self.niter - self.decay_epoch)
 
             start_time = time.time()
-            step = 0
-            for realA, realB in itertools.izip(self.train_loader_A, self.train_loader_B):
+            for step, (realA, realB) in enumerate(itertools.izip(self.train_loader_A, self.train_loader_B)):
 
                 realA, realB = Variable(realA.cuda()), Variable(realB.cuda())
                 ############################
@@ -219,7 +188,7 @@ class Trainer(object):
                          loss_D_A, loss_D_B, loss_G_A, loss_G_B, loss_cycle_A, loss_cycle_B))
 
 
-                if step % 50 == 0:
+                if step % self.sample_step == 0:
                     realA = test_loader_A.next()
                     realB = test_loader_B.next()
 
@@ -233,16 +202,10 @@ class Trainer(object):
 
                     save_imgs(realA, fakeB, cycleA, realB, fakeA, cycleB, self.outf, epoch, step)
 
-                if step% 100 == 0 and step != 0:
-                    # do checkpointing
+                if step% self.checkpoint_step == 0 and step != 0:
                     torch.save(self.netG_A.state_dict(), '%s/netG_A_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
                     torch.save(self.netD_A.state_dict(), '%s/netD_A_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
                     torch.save(self.netG_B.state_dict(), '%s/netG_B_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
                     torch.save(self.netD_B.state_dict(), '%s/netD_B_epoch-%03d_step-%s.pth' % (self.outf, epoch, step))
-
-                step += 1
-
-
-
-
+                    print("Saved checkpoint")
 

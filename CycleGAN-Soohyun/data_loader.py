@@ -49,15 +49,12 @@ def checkAB(root):
     train_root = os.path.join(root, "train")
     test_root = os.path.join(root, "test")
 
-    if not os.path.exists(train_root):
-        os.system("mkdir %s" % train_root)
-        os.system("mkdir %s" % os.path.join(train_root,"A"))
-        os.system("mkdir %s" % os.path.join(train_root,"B"))
-
-    if not os.path.exists(test_root):
-        os.system("mkdir %s" % test_root)
-        os.system("mkdir %s" % os.path.join(test_root,"A"))
-        os.system("mkdir %s" % os.path.join(test_root,"B"))
+    type_list = [train_root,os.path.join(train_root,"A"),os.path.join(train_root,"B"),
+                 test_root, os.path.join(test_root,"A"),os.path.join(test_root,"B")]
+    for p in type_list:
+        if not os.path.exists(p):
+            os.system("mkdir %s" % p)
+            print("Creating path",p)
 
     trainA, trainB = os.path.exists(os.path.join(train_root,"A")), os.path.exists(os.path.join(train_root,"B"))
     testA, testB = os.path.exists(os.path.join(test_root,"A")), os.path.exists(os.path.join(test_root,"B"))
@@ -73,6 +70,7 @@ def train_test_split(root, split_ratio):
     np.random.shuffle(paths_A)
     np.random.shuffle(paths_B)
 
+    print("Start splitting...")
     for i in tqdm(range(len(paths_A))):
         a, b = paths_A[i], paths_B[i]
         if i <= num_train:
