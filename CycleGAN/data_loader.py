@@ -91,10 +91,9 @@ def get_loader(root, batch_size, image_size, split_ratio, num_workers=2, shuffle
 
     len_train_A = len(glob.glob(os.path.join(train_root, 'A/*')))
     len_train_B = len(glob.glob(os.path.join(train_root, 'B/*')))
-    len_test_A = len(glob.glob(os.path.join(test_root, 'A/*')))
-    len_test_B = len(glob.glob(os.path.join(test_root, 'B/*')))
 
-    if len_train_A and len_train_B and len_test_A and len_test_B:
+
+    if len_train_A and len_train_B:
         pass
     else:
         train_test_split(root, split_ratio)
@@ -102,9 +101,6 @@ def get_loader(root, batch_size, image_size, split_ratio, num_workers=2, shuffle
     trainA_dataset, trainB_dataset = \
         Dataset(train_root, image_size, "A"), \
         Dataset(train_root, image_size, "B")
-    testA_dataset, testB_dataset = \
-        Dataset(test_root, image_size, "A"), \
-        Dataset(test_root, image_size, "B")
 
     trainA_loader = torch.utils.data.DataLoader(dataset=trainA_dataset,
                                                 batch_size=batch_size,
@@ -114,18 +110,10 @@ def get_loader(root, batch_size, image_size, split_ratio, num_workers=2, shuffle
                                                 batch_size=batch_size,
                                                 shuffle=True,
                                                 num_workers=num_workers)
-    testA_loader = torch.utils.data.DataLoader(dataset=testA_dataset,
-                                                batch_size=batch_size,
-                                                shuffle=True,
-                                                num_workers=num_workers)
-    testB_loader = torch.utils.data.DataLoader(dataset=testB_dataset,
-                                                batch_size=batch_size,
-                                                shuffle=True,
-                                                num_workers=num_workers)
+
     trainA_loader.shape = trainA_dataset.shape
     trainB_loader.shape = trainB_dataset.shape
-    testA_loader.shape = testA_dataset.shape
-    testB_loader.shape = testA_dataset.shape
 
-    dataloader = [trainA_loader, trainB_loader, testA_loader, testB_loader]
+
+    dataloader = [trainA_loader, trainB_loader]
     return dataloader
