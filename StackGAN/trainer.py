@@ -114,7 +114,7 @@ class Trainer(object):
             state_dict = \
                 torch.load(self.config.stageI_G,
                            map_location=lambda storage, loc: storage)
-            netG.stageI_G.load_state_dict(state_dict)
+            netG.STAGE1_G.load_state_dict(state_dict)
         else:
             print("Please give the StageI_G path")
             return
@@ -227,7 +227,7 @@ class Trainer(object):
             if epoch % self.snapshot_interval == 0:
                 save_model(netG, netD, epoch, self.model_dir)
         #
-        save_model(netG, netD, self.n_iters, self.model_dir)
+        save_model(netG, netD, self.niter, self.model_dir)
 
     def sample(self):
         if self.stage == 1:
