@@ -1,0 +1,10 @@
+samples
+folder
+*.pyc
+.idea
+
+SGAN/cifar10
+datasets
+
+gifs
+
