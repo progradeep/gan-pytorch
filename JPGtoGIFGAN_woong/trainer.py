@@ -1,35 +1,31 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.autograd import Variable
-import itertools, time, os
-from glob import glob
-from utils import save_imgs
 import torchvision.utils as vutils
-import models.cyclegan as cyclegan
+from torch.autograd import Variable
+from data_loader import get_loader
 
+import models.pix2pix as pix2pix
 
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
         m.weight.data.normal_(0.0, 0.02)
-
-    elif classname.find('BatchNorm') != -1:
+    elif classname.find('BatchNorm') != -1 or classname.find('InstanceNorm2d') != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
 
-
 class Trainer(object):
-    def __init__(self, config, dataloader):
+    def __init__(self, config):
         self.config = config
-        self.train_loader_A = dataloader[0]
-        self.train_loader_B = dataloader[1]
-        self.test_loader_A = dataloader[2]
-        self.test_loader_B = dataloader[3]
+        self.dataroot = config.dataroot
+        self.workers = config.workers
+
         self.ngpu = int(config.ngpu)
+        self.nc = int(config.nc)
         self.input_nc = int(config.input_nc)
         self.output_nc = int(config.output_nc)
-
+        self.nz = int(config.nz)
         self.ngf = int(config.ngf)
         self.ndf = int(config.ndf)
         self.cuda = config.cuda
@@ -39,213 +35,127 @@ class Trainer(object):
 
         self.lr = config.lr
         self.beta1 = config.beta1
-        self.beta2 = config.beta2
 
         self.niter = config.niter
-        self.decay_epoch = config.decay_epoch
-        self.cycle_lambda = config.cycle_lambda
 
         self.outf = config.outf
-        self.sample_step = config.sample_step
-        self.checkpoint_step = config.checkpoint_step
+
+        self.lamb = config.lamb
 
         self.build_model()
 
         if self.cuda:
-            self.netG_AB.cuda()
-            self.netD_A.cuda()
-            self.netG_BA.cuda()
-            self.netD_B.cuda()
-
-    def load_model(self):
-        print("[*] Load models from {}...".format(self.outf))
-
-        paths = glob(os.path.join(self.outf, 'net*.pth'))
-        paths.sort()
-
-        if len(paths) == 0:
-            print("[!] No checkpoint found in {}...".format(self.outf))
-            return
-
-        epochs = [int(os.path.basename(path.split('.')[0].split('_')[-2].split('-')[-1])) for path in paths]
-        self.start_epoch = str(max(epochs))
-        steps = [int(os.path.basename(path.split('.')[0].split('_')[-1].split('-')[-1])) for path in paths]
-        self.start_step = str(max(steps))
-
-
-
-        G_AB_filename = '{}/netG_A_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
-        G_BA_filename = '{}/netG_B_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
-        D_A_filename = '{}/netD_A_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
-        D_B_filename = '{}/netD_B_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
-
-
-        self.netG_AB.load_state_dict(torch.load(G_AB_filename))
-        self.netG_BA.load_state_dict(torch.load(G_BA_filename))
-        self.netD_A.load_state_dict(torch.load(D_A_filename))
-        self.netD_B.load_state_dict(torch.load(D_B_filename))
-
-
-        print("[*] Model loaded: {}".format(G_AB_filename))
-
+            self.netD.cuda()
+            self.netG.cuda()
 
     def build_model(self):
-        self.netG_AB = cyclegan._netG(self.ngpu, self.ngf,
-                                      self.input_nc, self.output_nc * 10)
-        self.netG_AB.apply(weights_init)
-
-        self.netG_BA = cyclegan._netG(self.ngpu, self.ngf,
-                                      self.input_nc * 10, self.output_nc)
-        self.netG_BA.apply(weights_init)
-
-
-        self.netD_A = cyclegan._netD(self.ngpu, self.ndf, self.input_nc)
-        self.netD_A.apply(weights_init)
-
-        self.netD_B = cyclegan._netD(self.ngpu, self.ndf, self.input_nc * 10)
-        self.netD_B.apply(weights_init)
-
-        if self.config.model_path != '':
-            self.load_model()
-
-
+        self.netG = pix2pix.define_G(self.input_nc, self.output_nc * 10, self.ngf, 'batch', False, [])
+        self.netD = pix2pix.define_D(self.input_nc + self.output_nc * 10, self.ndf, 'batch', False, [])
+        if self.config.netG != '':
+            self.netG.load_state_dict(torch.load(self.config.netG))
+        if self.config.netD != '':
+            self.netD.load_state_dict(torch.load(self.config.netD))
+        print('---------- Networks initialized -------------')
+        pix2pix.print_network(self.netG)
+        pix2pix.print_network(self.netD)
+        print('---------------------------------------------')
+        
     def train(self):
-        MSELoss = nn.MSELoss()
-        L1loss = nn.L1Loss()
+        self.data_loader = get_loader(dataroot=self.dataroot, batch_size=self.batch_size, image_size = self.image_size
+                                 ,num_workers=int(self.workers), shuffle = True)
+
+        criterionGAN = pix2pix.GANLoss()
+        criterionL1 = nn.L1Loss()
+
+        real_a = torch.FloatTensor(self.batch_size, self.input_nc, self.image_size, self.image_size)
+        real_b = torch.FloatTensor(self.batch_size, self.output_nc * 10, self.image_size, self.image_size)
 
         if self.cuda:
-            MSELoss.cuda()
-            L1loss.cuda()
+            criterionGAN = criterionGAN.cuda()
+            criterionL1 = criterionL1.cuda()
+            real_a = real_a.cuda()
+            real_b = real_b.cuda()
+
+        real_a = Variable(real_a)
+        real_b = Variable(real_b)
 
         # setup optimizer
-        optimizerD_A = optim.Adam(self.netD_A.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
-        optimizerD_B = optim.Adam(self.netD_B.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
-        optimizerG = optim.Adam(itertools.chain(self.netG_AB.parameters(), self.netG_BA.parameters()), lr=self.lr, betas=(self.beta1, self.beta2))
-
-        test_loader_A, test_loader_B = iter(self.test_loader_A), iter(self.test_loader_B)
+        optimizerD = optim.Adam(self.netD.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        optimizerG = optim.Adam(self.netG.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
 
         for epoch in range(self.niter):
-            if (epoch+1) > self.decay_epoch:
-                optimizerD_A.param_groups[0]['lr'] -= self.lr / (self.niter - self.decay_epoch)
-                optimizerD_B.param_groups[0]['lr'] -= self.lr / (self.niter - self.decay_epoch)
-                optimizerG.param_groups[0]['lr'] -= self.lr / (self.niter - self.decay_epoch)
+            for i, data in enumerate(self.data_loader, 0):
+                # forward
+                real_a_cpu, real_b_cpu = data[0], torch.cat(data[1], 1)
+                batch_size = real_a_cpu.size(0)
+                real_a.data.resize_(real_a_cpu.size()).copy_(real_a_cpu)
+                real_b.data.resize_(real_b_cpu.size()).copy_(real_b_cpu)
+                fake_b = self.netG(real_a)
 
-            start_time = time.time()
-            for step, (realA, realB) in enumerate(itertools.izip(self.train_loader_A, self.train_loader_B)):
-                realB = torch.cat(realB, 1)
-                batch_size = realA.size(0)
-                realA, realB = Variable(realA.cuda()), Variable(realB.cuda())
                 ############################
-                # (1) Update G network: minimize Lgan(MSE) + Lcycle(L1)
+                # (1) Update D network: maximize log(D(x,y)) + log(1 - D(x,G(x)))
                 ###########################
-                for p in self.netD_A.parameters():
-                    p.requires_grad = False
-                for p in self.netD_B.parameters():
-                    p.requires_grad = False
 
-                self.netG_AB.zero_grad()
-                self.netG_BA.zero_grad()
+                optimizerD.zero_grad()
 
-                # GAN loss: D_A(G_A(A))
-                fakeB = self.netG_AB(realA)
-                output = self.netD_B(fakeB)
-                loss_G_A = MSELoss(output, Variable(torch.ones(output.size()).cuda()))
+                # train with fake
+                fake_ab = torch.cat((real_a, fake_b), 1)
+                pred_fake = self.netD.forward(fake_ab.detach())
+                loss_d_fake = criterionGAN(pred_fake, False)
 
-                # GAN loss: D_B(G_B(B))
-                fakeA = self.netG_BA(realB)
-                output = self.netD_A(fakeA)
-                loss_G_B = MSELoss(output, Variable(torch.ones(output.size()).cuda()))
+                # train with real
+                real_ab = torch.cat((real_a, real_b), 1)
+                pred_real = self.netD.forward(real_ab)
+                loss_d_real = criterionGAN(pred_real, True)
 
-                # Forward cycle loss: A <-> G_B(G_A(A))
-                cycleA = self.netG_BA(fakeB)
-                loss_cycle_A = L1loss(cycleA, realA) * self.cycle_lambda
+                # Combined loss
+                loss_d = (loss_d_fake + loss_d_real) * 0.5
 
-                # Backward cycle loss: B <-> G_A(G_B(B))
-                cycleB = self.netG_AB(fakeA)
-                loss_cycle_B = L1loss(cycleB, realB) * self.cycle_lambda
+                loss_d.backward()
 
-                # Combined Generator loss
-                loss_G = loss_G_A + loss_G_B + loss_cycle_A + loss_cycle_B
-                loss_G.backward()
+                optimizerD.step()
+
+                ############################
+                # (2) Update G network: maximize log(D(x,G(x))) + L1(y,G(x))
+                ##########################
+                optimizerG.zero_grad()
+                # First, G(A) should fake the discriminator
+                fake_ab = torch.cat((real_a, fake_b), 1)
+                pred_fake = self.netD.forward(fake_ab)
+                loss_g_gan = criterionGAN(pred_fake, True)
+
+                # Second, G(A) = B
+                loss_g_l1 = criterionL1(fake_b, real_b) * self.lamb
+
+                loss_g = loss_g_gan + loss_g_l1
+
+                loss_g.backward()
+
                 optimizerG.step()
 
+                print("===> Epoch[{}]({}/{}): Loss_D: {:.4f} Loss_G: {:.4f}".format(
+                    epoch, i, len(self.data_loader), loss_d.data[0], loss_g.data[0]))
 
-                ############################
-                # (2) Update D network: minimize LSGAN loss
-                ###########################
-                for p in self.netD_A.parameters():
-                    p.requires_grad = True
-                for p in self.netD_B.parameters():
-                    p.requires_grad = True
-
-                ## train D_A ##
-                # train with real
-                self.netD_A.zero_grad()
-
-                D_A_real = self.netD_A(realA)
-                loss_D_A_real = MSELoss(D_A_real, Variable(torch.ones(D_A_real.size()).cuda()))
-
-                # train with fake
-                D_A_fake = self.netD_A(fakeA.detach())
-                loss_D_A_fake = MSELoss(D_A_fake, Variable(torch.zeros(D_A_fake.size()).cuda()))
-
-                loss_D_A = loss_D_A_real + loss_D_A_fake
-                loss_D_A.backward()
-                optimizerD_A.step()
-
-                ## train D_B ##
-                # train with real
-                self.netD_B.zero_grad()
-
-                D_B_real = self.netD_B(realB)
-                loss_D_B_real = MSELoss(D_B_real, Variable(torch.ones(D_B_real.size()).cuda()))
-
-                # train with fake
-                D_B_fake = self.netD_B(fakeB.detach())
-                loss_D_B_fake = MSELoss(D_B_fake, Variable(torch.zeros(D_B_fake.size()).cuda()))
-
-                loss_D_B = loss_D_B_real + loss_D_B_fake
-                loss_D_B.backward()
-                optimizerD_B.step()
-
-
-                step_end_time = time.time()
-
-                print('[%d/%d][%d/%d] - time_passed: %.2f, loss_D_A: %.3f, loss_D_B: %.3f, '
-                      'loss_G_A: %.3f, loss_G_B: %.3f, loss_A_cycle: %.3f, loss_B_cycle: %.3f'
-                      % (epoch, self.niter, step, len(self.train_loader_A), step_end_time - start_time,
-                         loss_D_A, loss_D_B, loss_G_A, loss_G_B, loss_cycle_A, loss_cycle_B))
-
-
-                if step % self.sample_step == 0:
-                    realA = test_loader_A.next()
-                    realB = torch.cat(test_loader_B.next(), 1)
-
-                    realA = Variable(realA.cuda(), volatile=True)
-                    fakeB = self.netG_AB(realA)
-                    cycleA = self.netG_BA(fakeB)
-
-                    realB = Variable(realB.cuda(), volatile=True)
-                    fakeA = self.netG_BA(realB)
-                    cycleB = self.netG_AB(fakeA)
-
-                    vutils.save_image(realA.data,
-                            '%s/real_samples_A_epoch_%03d.png' % (self.outf, epoch),
+                if i % 1 == 0:
+                    real_a_cpu.resize_(batch_size, self.nc, self.image_size, self.image_size)
+                    vutils.save_image(real_a_cpu,
+                            '%s/real_samples_A.png' % self.outf,
                             normalize=True, nrow=1)
-                    fakeB.data.resize_(batch_size * 10, self.input_nc, self.image_size, self.image_size)
-                    vutils.save_image(fakeB.data,
+                    real_b_cpu.resize_(batch_size * 10, self.nc, self.image_size, self.image_size)
+                    vutils.save_image(real_b_cpu,
+                            '%s/real_samples_B.png' % self.outf,
+                            normalize=True, nrow=10)
+                    fake_b = self.netG(real_a)
+                    fake_b.data.resize_(batch_size * 10, self.nc, self.image_size, self.image_size)
+                    vutils.save_image(fake_b.data,
                             '%s/fake_samples_B_epoch_%03d.png' % (self.outf, epoch),
                             normalize=True, nrow=10)
-                    vutils.save_image(cycleA.data,
-                            '%s/cycle_samples_A_epoch_%03d.png' % (self.outf, epoch),
-                            normalize=True, nrow=1)
 
-                    #save_imgs(realA, fakeB, cycleA, realB, fakeA, cycleB, self.outf, epoch, step)
 
-                if step% self.checkpoint_step == 0 and step != 0:
-                    torch.save(self.netG_AB.state_dict(), '%s/netG_A_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                    torch.save(self.netD_A.state_dict(), '%s/netD_A_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                    torch.save(self.netG_BA.state_dict(), '%s/netG_B_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                    torch.save(self.netD_B.state_dict(), '%s/netD_B_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                    print("Saved checkpoint")
+            # do checkpointing
+            torch.save(self.netG.state_dict(), '%s/netG_epoch_%03d.pth' % (self.outf, epoch))
+            torch.save(self.netD.state_dict(), '%s/netD_epoch_%03d.pth' % (self.outf, epoch)) 
+
+
+
 
