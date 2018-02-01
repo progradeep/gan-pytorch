@@ -24,27 +24,27 @@ class _netG(nn.Module):
             # input. (nc) * 128 * 128
             nn.Conv2d(self.input_nc, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
-            nn.ReLU(True),
+            nn.LeakyReLU(0.2, inplace=True),
             # state size. (ngf) x 64 x 64
 
             nn.Conv2d(ngf, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
-            nn.ReLU(True),
+            nn.LeakyReLU(0.2, inplace=True),
             # state size. (ngf*2) x 32 x 32
 
             nn.Conv2d(ngf * 2, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
-            nn.ReLU(True),
+            nn.LeakyReLU(0.2, inplace=True),
             # state size. (ngf*4) x 16 x 16
 
             nn.Conv2d(ngf * 4, ngf * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 8),
-            nn.ReLU(True),
+            nn.LeakyReLU(0.2, inplace=True),
             # state size. (ngf*4) x 8 x 8
 
             nn.Conv2d(ngf * 8, ngf * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 8),
-            nn.ReLU(True),
+            nn.LeakyReLU(0.2, inplace=True),
             # state size. (ngf*8) x 4 x 4
 
         )
@@ -159,14 +159,14 @@ class _netG(nn.Module):
         h = self.decoder(z.view(z.size(0), z.size(1), 1, 1))
         # print("h", h.shape)
         # h size. 80, 3, 128, 128
-        h = h.view(int(h.size(0) / self.ntimestep), self.input_nc, self.ntimestep ,  h.size(3), h.size(3))
+        h = h.view(int(h.size(0) / self.ntimestep), self.ntimestep,  self.input_nc, h.size(3), h.size(3))
 
         z_category_labels = torch.from_numpy(z_category)
 
         if torch.cuda.is_available():
             z_category_labels = z_category_labels.cuda()
 
-        # h = h.permute(0, 2, 1, 3, 4)
+        h = h.permute(0, 2, 1, 3, 4)
         return h, Variable(z_category_labels, requires_grad=False)
 
     def sample_im(self, bs, input):

@@ -8,6 +8,10 @@ import numpy as np
 import torchvision.utils as vutils
 import models.soohyun as cyclegan
 
+def denorm(x):
+    out = (x + 1) / 2
+    return out.clamp(0, 1)
+
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -105,22 +109,22 @@ class Trainer(object):
         # self, ngpu, ngf, input_nc, dim_z_content, dim_z_category, dim_z_motion):
         self.netG = cyclegan._netG(self.ngpu, self.ngf, self.input_nc, self.dim_z_content,
                                    self.dim_z_category, self.dim_z_motion, self.config.ntimestep)
-        self.netG.apply(weights_init)
+        #self.netG.apply(weights_init)
 
         # self, n_channels, n_output_neurons = 1, ndf = 64):
         self.netD_V = cyclegan._netD_V(self.ngpu, self.input_nc)
-        self.netD_V.apply(weights_init)
+        #self.netD_V.apply(weights_init)
 
         self.netD_I = cyclegan._netD_I(self.input_nc)
-        self.netD_I.apply(weights_init)
+        #self.netD_I.apply(weights_init)
 
         self.image_reconstructor = cyclegan.ImageReconstructor(self.input_nc,
                                                               self.dim_z_content + self.dim_z_category + self.dim_z_motion)
-        self.image_reconstructor.apply(weights_init)
+        #self.image_reconstructor.apply(weights_init)
 
         self.video_reconstructor = cyclegan.VideoReconstructor(self.input_nc, self.config.ntimestep,
                                                               self.dim_z_content + self.dim_z_category + self.dim_z_motion)
-        self.video_reconstructor.apply(weights_init)
+        #self.video_reconstructor.apply(weights_init)
 
         self.load_model()
 
@@ -136,7 +140,8 @@ class Trainer(object):
         # setup optimizer
         optimizerD_V = optim.Adam(self.netD_V.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
         optimizerD_I = optim.Adam(self.netD_I.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
-        optimizerG = optim.Adam(itertools.chain(self.netG.parameters(), self.image_reconstructor.parameters(), self.video_reconstructor.parameters()), lr=self.lr, betas=(self.beta1, self.beta2))
+        #optimizerG = optim.Adam(itertools.chain(self.netG.parameters(), self.image_reconstructor.parameters(), self.video_reconstructor.parameters()), lr=self.lr, betas=(self.beta1, self.beta2))
+        optimizerG = optim.Adam(self.netG.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
         # optimizerG = optim.Adam(self.netG.parameters(), lr=self.lr, betas=(self.beta1, self.beta2))
 
         A_loader, B_loader = iter(self.train_loader_A), iter(self.train_loader_B)
@@ -164,7 +169,7 @@ class Trainer(object):
                 # print(realGif.shape)
 
                 vutils.save_image(realGif[0,:,0,:,:], '%s/test.png' % (self.outf), nrow=1, normalize=True)
-                realIm, realGif = Variable(realIm.cuda()), Variable(realGif.cuda())
+                realIm, realGif = Variable(realIm.cuda(), requires_grad=False), Variable(realGif.cuda(), requires_grad=False)
                 # if step % self.sample_step == 0:
                 #     a = realGif.resize(self.batch_size * self.config.ntimestep, self.input_nc, self.image_size,
                 #                                 self.image_size)
@@ -197,9 +202,9 @@ class Trainer(object):
                 output = self.netD_V(fakeGif) # output size. (8, 1, 1, )
                 loss_G = BCELoss(output, Variable(torch.ones(output.size()).cuda()))
 
-                recon = self.video_reconstructor(fakeGif)
+                ####recon = self.video_reconstructor(fakeGif)
                 # print("recon", recon.shape)
-                loss_G += torch.mean(torch.abs(recon - realIm))
+                ####loss_G += torch.mean(torch.abs(recon - realIm))
 
                 #### train with image
                 fakeIm = fake[1][0]
@@ -208,8 +213,8 @@ class Trainer(object):
                 output = self.netD_I(fakeIm)
                 loss_G += BCELoss(output, Variable(torch.ones(output.size()).cuda()))
 
-                recon = self.image_reconstructor(fakeIm)
-                loss_G += torch.mean(torch.abs(recon - realIm))
+                ####recon = self.image_reconstructor(fakeIm)
+                ####loss_G += torch.mean(torch.abs(recon - realIm))
 
                 loss_G.backward()
                 optimizerG.step()
@@ -266,12 +271,12 @@ class Trainer(object):
                     fake = self.netG(valid_x_A)
 
                     fakeGif = fake[0][0].resize(self.batch_size*self.config.ntimestep, self.input_nc, self.image_size, self.image_size)
-                    vutils.save_image(fakeGif.data, '%s/fakeGif_AB_%03d_%d.png' % (self.outf, epoch, step), nrow=self.config.ntimestep, normalize=True)
+                    vutils.save_image(denorm(fakeGif.data), '%s/fakeGif_AB_%03d_%d.png' % (self.outf, epoch, step), nrow=self.config.ntimestep)
 
                     fakeIm = fake[1][0].resize(self.batch_size, self.input_nc, self.image_size,
                                                 self.image_size)
-                    vutils.save_image(fakeIm.data, '%s/fakeIm_AB_%03d_%d.png' % (self.outf, epoch, step),
-                                      nrow=1, normalize=True)
+                    vutils.save_image(denorm(fakeIm.data), '%s/fakeIm_AB_%03d_%d.png' % (self.outf, epoch, step),
+                                      nrow=1)
 
                 if step% self.checkpoint_step == 0 and step != 0:
                     torch.save(self.netG.state_dict(), '%s/netG_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
