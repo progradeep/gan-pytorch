@@ -126,7 +126,7 @@ class Trainer(object):
 
 
     def train(self):
-        BCELoss = nn.MSELoss()
+        BCELoss = nn.BCEWithLogitsLoss()
         L1loss = nn.L1Loss()
 
         if self.cuda:
@@ -159,10 +159,19 @@ class Trainer(object):
             for step, (realIm, realGif) in enumerate(itertools.izip(self.train_loader_A, self.train_loader_B)):
                 # realGif size. 8, 30, 128, 128
                 # realIm size. 8, 3, 128, 128
-                realGif = realGif.view(-1, self.input_nc, self.config.dim_z_motion, self.image_size, self.image_size)
+                realGif = realGif.view(-1, self.config.ntimestep, self.input_nc, self.image_size, self.image_size)
+                realGif = realGif.permute(0,2,1,3,4)
                 # print(realGif.shape)
 
                 realIm, realGif = Variable(realIm.cuda()), Variable(realGif.cuda())
+                # if step % self.sample_step == 0:
+                #     a = realGif.resize(self.batch_size * self.config.ntimestep, self.input_nc, self.image_size,
+                #                                 self.image_size)
+                #     vutils.save_image(a.data, '%s/realGif_AB_%03d_%d.png' % (self.outf, epoch, step), nrow=self.config.ntimestep, normalize=True)
+                #
+                #     vutils.save_image(realIm.data, '%s/realIm_AB_%03d_%d.png' % (self.outf, epoch, step),
+                #                       nrow=1, normalize=True)
+
                 ############################
                 # (1) Update G network: minimize Lgan(MSE) + Lcycle(L1)
                 ###########################
