@@ -1,4 +1,4 @@
-import os
+import os, time
 from itertools import chain
 
 import numpy as np
@@ -118,6 +118,8 @@ class Trainer(object):
         valid_x_B = self._get_variable(valid_x_B).resize(self.video_batch_size * 10, self.n_channels, self.image_size, self.image_size)
         vutils.save_image(valid_x_B.data, '{}/valid_gif.png'.format(self.log_folder), nrow=10, normalize=True)
 
+        start_time = time.time()
+
         for epoch in range(self.train_batches):
 
             for step, (realIm, realGif) in enumerate(itertools.izip(self.train_loader_A, self.train_loader_B)):
@@ -126,6 +128,9 @@ class Trainer(object):
 
                 realIm, realGif = Variable(realIm.cuda(), requires_grad=False), Variable(realGif.cuda(), requires_grad=False)
 
+                video_batch_size = realGif.size(0)
+                image_batch_size = realIm.size(0)
+
                 ############################
                 # (1) Update G network: minimize Lgan(MSE) + Lcycle(L1)
                 ###########################
@@ -133,9 +138,10 @@ class Trainer(object):
                 self.image_reconstructor.zero_grad()
                 self.video_reconstructor.zero_grad()
 
+
                 #### train with gif
                 # GAN loss: D_A(G_A(A))
-                fake = (self.generator.sample_videos(realIm, self.video_batch_size), self.generator.sample_images(realIm, self.image_batch_size))
+                fake = (self.generator.sample_videos(realIm, video_batch_size), self.generator.sample_images(realIm, image_batch_size))
                 fakeGif, fake_categ = fake[0][0], fake[0][1]
                 # fakeCateg size. (8)
 
@@ -191,8 +197,14 @@ class Trainer(object):
                 loss_D_I.backward()
                 opt_image_discriminator.step()
 
-                print('[%d/%d] - loss_D_V: %.3f, loss_D_I: %.3f, loss_G: %.3f'
-                      % (epoch, step, loss_D_V, loss_D_I, loss_G))
+                step_end_time = time.time()
+
+                print('[%d/%d][%d/%d] - time: %.2f, loss_D_V: %.3f, loss_D_I: %.3f, '
+                      'loss_G: %.3f'
+                      % (epoch, self.niter, step, self.num_steps, step_end_time - start_time,
+                         loss_D_V, loss_D_I, loss_G))
+
+
 
                 if step % 20 == 0:
                     fake = (self.generator.sample_videos(valid_x_A, self.video_batch_size), self.generator.sample_images(valid_x_A, self.image_batch_size))

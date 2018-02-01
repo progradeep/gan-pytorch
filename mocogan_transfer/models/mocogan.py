@@ -218,12 +218,15 @@ class VideoGenerator(nn.Module):
             nn.Conv2d(self.n_channels, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.LeakyReLU(0.2, inplace=True),
+
             nn.Conv2d(ngf, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.LeakyReLU(0.2, inplace=True),
+
             nn.Conv2d(ngf * 2, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
             nn.LeakyReLU(0.2, inplace=True),
+
             nn.Conv2d(ngf * 4, ngf * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 8), 
             nn.LeakyReLU(0.2, inplace=True)
