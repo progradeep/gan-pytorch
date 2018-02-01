@@ -51,8 +51,8 @@ class Trainer(object):
         self.use_infogan = config.use_infogan
         self.use_categories = config.use_categories
 
-        self.video_batch_size = self.video_sampler.batch_size
-        self.image_batch_size = self.image_sampler.batch_size
+        self.video_batch_size = self.video_loader.batch_size
+        self.image_batch_size = self.image_loader.batch_size
 
         self.log_interval = int(config.print_every)
         self.train_batches = int(config.batches)
@@ -214,9 +214,9 @@ class Trainer(object):
                 loss_D_I.backward()
                 opt_image_discriminator.step()
 
-                print('step: %d - loss_D_V: %.3f, loss_D_I: %.3f, '
+                print('epoch: %d, step: %d - loss_D_V: %.3f, loss_D_I: %.3f, '
                       'loss_G: %.3f'
-                      % (batch_num, 
+                      % (epoch, step, 
                          loss_D_V, loss_D_I, loss_G))
 
 
