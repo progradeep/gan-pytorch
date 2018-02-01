@@ -220,7 +220,7 @@ class Trainer(object):
                          loss_D_V, loss_D_I, loss_G))
 
 
-                if step % 10 == 0:
+                if step % 30 == 0:
                     fake = (self.generator.sample_videos(valid_x_A, self.video_batch_size), self.generator.sample_images(valid_x_A, self.image_batch_size))
 
                     fakeGif = fake[0][0].resize(self.video_batch_size * 10, self.n_channels, self.image_size, self.image_size)
