@@ -163,6 +163,7 @@ class Trainer(object):
                 realGif = realGif.permute(0,2,1,3,4)
                 # print(realGif.shape)
 
+                vutils.save_image(realGif[0,:,0,:,:], '%s/test.png' % (self.outf), nrow=1, normalize=True)
                 realIm, realGif = Variable(realIm.cuda()), Variable(realGif.cuda())
                 # if step % self.sample_step == 0:
                 #     a = realGif.resize(self.batch_size * self.config.ntimestep, self.input_nc, self.image_size,
