@@ -201,13 +201,14 @@ class Trainer(object):
 
                 print('[%d/%d][%d/%d] - time: %.2f, loss_D_V: %.3f, loss_D_I: %.3f, '
                       'loss_G: %.3f'
-                      % (epoch, self.niter, step, self.num_steps, step_end_time - start_time,
+                      % (epoch, self.train_batches, step, len(self.train_loader_A), step_end_time - start_time,
                          loss_D_V, loss_D_I, loss_G))
 
 
 
                 if step % 20 == 0:
                     fake = (self.generator.sample_videos(valid_x_A, self.video_batch_size), self.generator.sample_images(valid_x_A, self.image_batch_size))
+                    fakeGif = fake[0][0]
                     fakeGif = fakeGif.permute(0, 2, 1, 3, 4)
                     fakeGif = fakeGif.resize(self.video_batch_size * 10, self.n_channels, self.image_size, self.image_size)
                     vutils.save_image(denorm(fakeGif.data), '%s/fakeGif_AB_%03d_%d.png' % (self.log_folder, epoch, step), nrow=10)
