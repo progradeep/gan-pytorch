@@ -22,7 +22,8 @@ parser.add_argument('--image_discriminator', default='PatchImageDiscriminator', 
 parser.add_argument('--video_discriminator', default='CategoricalVideoDiscriminator', help='specifies video discriminator type (see mocogan.py for a list of available models')
 
 parser.add_argument('--video_length', type=int, default=10, help='length of the video')
-parser.add_argument('--print_every', type=int, default=100, help='print every iterations')
+parser.add_argument('--log_interval', type=int, default=20, help='save valid gif and image')
+parser.add_argument('--checkpoint_interval', type=int, default=200, help='save checkpoint')
 parser.add_argument('--n_channels', type=int, default=3, help='number of channels in the input data')
 
 parser.add_argument('--every_nth', type=int, default=4, help='sample training videos using every nth frame')

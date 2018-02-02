@@ -1,4 +1,4 @@
-import os, time
+import os, time, glob
 from itertools import chain
 
 import numpy as np
@@ -49,7 +49,8 @@ class Trainer(object):
         self.image_batch_size = self.train_loader_A.batch_size
         self.video_batch_size = self.train_loader_B.batch_size
 
-        self.log_interval = int(config.print_every)
+        self.log_interval = int(config.log_interval)
+        self.checkpoint_step = int(config.checkpoint_step)
         self.train_batches = int(config.batches)
 
         self.use_cuda = config.cuda
@@ -57,8 +58,7 @@ class Trainer(object):
         self.image_enumerator = None
         self.video_enumerator = None
 
-
-        self.log_folder = config.outf
+        self.outf = config.outf
 
         self.build_model()
 
@@ -68,6 +68,42 @@ class Trainer(object):
             self.video_reconstructor.cuda()
             self.image_discriminator.cuda()
             self.video_discriminator.cuda()
+
+    def load_model(self):
+        print("[*] Load models from {}...".format(self.outf))
+
+        paths = glob.glob(os.path.join(self.outf, 'net*.pth'))
+        paths.sort()
+        self.start_epoch = 0
+
+        if len(paths) == 0:
+            print("[!] No checkpoint found in {}...".format(self.outf))
+            return
+
+        epochs = [int(os.path.basename(path.split('.')[0].split('_')[-2].split('-')[-1])) for path in paths]
+        self.start_epoch = str(max(epochs))
+        steps = [int(os.path.basename(path.split('.')[0].split('_')[-1].split('-')[-1])) for path in paths]
+        self.start_step = str(max(steps))
+
+
+        G_filename = '{}/netG_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+        D_V_filename = '{}/netD_V_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+        D_I_filename = '{}/netD_I_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+        Im_Recon_filename = '{}/ImageRecon_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+        Video_Recon_filename = '{}/VideoRecon_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+
+        self.generator.load_state_dict(torch.load(G_filename))
+        self.video_discriminator.load_state_dict(torch.load(D_V_filename))
+        self.image_discriminator.load_state_dict(torch.load(D_I_filename))
+        self.image_reconstructor.load_state_dict(torch.load(Im_Recon_filename))
+        self.video_reconstructor.load_state_dict(torch.load(Video_Recon_filename))
+
+
+        print("[*] Model loaded: {}".format(G_filename))
+        print("[*] Model loaded: {}".format(D_V_filename))
+        print("[*] Model loaded: {}".format(D_I_filename))
+        print("[*] Model loaded: {}".format(Im_Recon_filename))
+        print("[*] Model loaded: {}".format(Video_Recon_filename))
 
     def build_model(self):
         self.generator = mocogan.VideoGenerator(self.n_channels, self.dim_z_content, self.dim_z_category, self.dim_z_motion, self.video_length)
@@ -81,6 +117,10 @@ class Trainer(object):
         self.video_discriminator = self.build_discriminator(self.video_discriminator, dim_categorical=self.dim_z_category,
                                                         n_channels=self.n_channels, use_noise=self.use_noise,
                                                         noise_sigma=self.noise_sigma)
+
+        if self.outf != None:
+            self.load_model()
+
 
     def build_discriminator(self, type, **kwargs):
         discriminator_type = getattr(mocogan, type)
@@ -113,10 +153,10 @@ class Trainer(object):
         valid_x_A, valid_x_B = A_loader.next(), B_loader.next()
 
         valid_x_A = self._get_variable(valid_x_A).resize(self.image_batch_size, self.n_channels, self.image_size, self.image_size)
-        vutils.save_image(valid_x_A.data, '{}/valid_im.png'.format(self.log_folder), nrow=1, normalize=True)
+        vutils.save_image(valid_x_A.data, '{}/valid_im.png'.format(self.outf), nrow=1, normalize=True)
 
-        valid_x_B = self._get_variable(valid_x_B).resize(self.video_batch_size * 10, self.n_channels, self.image_size, self.image_size)
-        vutils.save_image(valid_x_B.data, '{}/valid_gif.png'.format(self.log_folder), nrow=10, normalize=True)
+        valid_x_B = self._get_variable(valid_x_B).resize(self.video_batch_size * self.video_length, self.n_channels, self.image_size, self.image_size)
+        vutils.save_image(valid_x_B.data, '{}/valid_gif.png'.format(self.outf), nrow=self.video_length, normalize=True)
 
         start_time = time.time()
 
@@ -206,26 +246,26 @@ class Trainer(object):
 
 
 
-                if step % 20 == 0:
+                if step % self.log_interval == 0:
                     fake = (self.generator.sample_videos(valid_x_A, self.video_batch_size), self.generator.sample_images(valid_x_A, self.image_batch_size))
                     fakeGif = fake[0][0]
                     fakeGif = fakeGif.permute(0, 2, 1, 3, 4)
-                    fakeGif = fakeGif.resize(self.video_batch_size * 10, self.n_channels, self.image_size, self.image_size)
-                    vutils.save_image(denorm(fakeGif.data), '%s/fakeGif_AB_%03d_%d.png' % (self.log_folder, epoch, step), nrow=10)
+                    fakeGif = fakeGif.resize(self.video_batch_size * self.video_length, self.n_channels, self.image_size, self.image_size)
+                    vutils.save_image(denorm(fakeGif.data), '%s/fakeGif_AB_%03d_%d.png' % (self.outf, epoch, step), nrow=self.video_length)
 
                     fakeIm = fake[1][0].resize(self.image_batch_size, self.n_channels, self.image_size,
                                                 self.image_size)
-                    vutils.save_image(denorm(fakeIm.data), '%s/fakeIm_AB_%03d_%d.png' % (self.log_folder, epoch, step),
+                    vutils.save_image(denorm(fakeIm.data), '%s/fakeIm_AB_%03d_%d.png' % (self.outf, epoch, step),
                                       nrow=1)
 
-                #if step% self.checkpoint_step == 0 and step != 0:
-                #    torch.save(self.netG.state_dict(), '%s/netG_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                #    torch.save(self.netD_V.state_dict(), '%s/netD_V_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                #    torch.save(self.netD_I.state_dict(), '%s/netD_I_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                #    torch.save(self.image_reconstructor.state_dict(), '%s/ImageRecon_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                #    torch.save(self.video_reconstructor.state_dict(), '%s/VideoRecon_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                if step% self.checkpoint_step == 0 and step != 0:
+                   torch.save(self.generator.state_dict(), '%s/netG_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                   torch.save(self.video_discriminator.state_dict(), '%s/netD_V_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                   torch.save(self.image_discriminator.state_dict(), '%s/netD_I_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                   torch.save(self.image_reconstructor.state_dict(), '%s/ImageRecon_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                   torch.save(self.video_reconstructor.state_dict(), '%s/VideoRecon_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
 
-                #    print("Saved checkpoint")
+                   print("Saved checkpoint")
 
     def _get_variable(self, inputs):
         out = Variable(inputs.cuda())
