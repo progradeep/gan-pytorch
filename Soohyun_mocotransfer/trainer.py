@@ -161,7 +161,7 @@ class Trainer(object):
 
         for epoch in range(self.train_batches):
 
-            for step, (realIm, realGif) in enumerate(itertools.zip_longest(self.train_loader_A, self.train_loader_B)):
+            for step, (realIm, realGif) in enumerate(itertools.izip(self.train_loader_A, self.train_loader_B)):
                 realGif = realGif.view(-1, 10, self.n_channels, self.image_size, self.image_size)
                 realGif = realGif.permute(0,2,1,3,4)
 
