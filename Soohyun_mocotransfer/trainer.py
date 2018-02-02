@@ -192,7 +192,7 @@ class Trainer(object):
                 loss_G += torch.mean(torch.abs(firstframe - realIm))
 
                 # infogan loss
-                loss_G += CrossEntropyLoss(outcateg.squeeze(), fake_categ)
+                loss_G += (CrossEntropyLoss(outcateg.squeeze(), fake_categ) * 10)
 
 
                 #### train with image
