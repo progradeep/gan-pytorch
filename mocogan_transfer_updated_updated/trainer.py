@@ -72,7 +72,7 @@ class Trainer(object):
     def load_model(self):
         print("[*] Load models from {}...".format(self.outf))
 
-        paths = glob.glob(os.path.join(self.outf, 'net*.pth'))
+        paths = glob.glob(os.path.join(self.outf, '*.pth'))
         paths.sort()
         self.start_epoch = 0
 
@@ -80,9 +80,9 @@ class Trainer(object):
             print("[!] No checkpoint found in {}...".format(self.outf))
             return
 
-        epochs = [int(os.path.basename(path.split('.')[0].split('_')[-2].split('-')[-1])) for path in paths]
+        epochs = [int(path.split('.')[-2].split('_')[-2].split('-')[-1]) for path in paths]
         self.start_epoch = str(max(epochs))
-        steps = [int(os.path.basename(path.split('.')[0].split('_')[-1].split('-')[-1])) for path in paths]
+        steps = [int(path.split('.')[-2].split('_')[-1].split('-')[-1]) for path in paths]
         self.start_step = str(max(steps))
 
 
