@@ -24,27 +24,27 @@ class _netG(nn.Module):
             # input. (nc) * 128 * 128
             nn.Conv2d(self.input_nc, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(True),
             # state size. (ngf) x 64 x 64
 
             nn.Conv2d(ngf, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(True),
             # state size. (ngf*2) x 32 x 32
 
             nn.Conv2d(ngf * 2, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(True),
             # state size. (ngf*4) x 16 x 16
 
             nn.Conv2d(ngf * 4, ngf * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 8),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(True),
             # state size. (ngf*4) x 8 x 8
 
-            nn.Conv2d(ngf * 8, ngf * 8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 8),
-            nn.LeakyReLU(0.2, inplace=True),
+            # nn.Conv2d(ngf * 8, ngf * 8, 4, 2, 1, bias=False),
+            # nn.BatchNorm2d(ngf * 8),
+            # nn.ReLU(True),
             # state size. (ngf*8) x 4 x 4
 
         )
@@ -62,33 +62,27 @@ class _netG(nn.Module):
 
         self.decoder = nn.Sequential(
             # state size. nz x 1 x 1
-            nn.ConvTranspose2d(dim_z, ngf, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf),
+            nn.ConvTranspose2d(dim_z, ngf * 8, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(ngf * 8),
             nn.ReLU(True),
-            # state size. (ngf) x 4 x 4
 
-            nn.ConvTranspose2d(ngf, ngf * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 2),
-            nn.ReLU(True),
-            # state size. (ngf * 2) x 8 x 8
+            # nn.ConvTranspose2d(ngf * 8, ngf * 8, 4, 2, 1, bias=False),
+            # nn.BatchNorm2d(ngf * 8),
+            # nn.ReLU(True),
 
-            nn.ConvTranspose2d(ngf * 2, ngf * 4, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
             nn.ReLU(True),
-            # state size. (ngf * 4) x 16 x 16
 
-            nn.ConvTranspose2d(ngf * 4, ngf * 8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 8),
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
-            # state size. (ngf * 8) x 32 x 32
 
-            nn.ConvTranspose2d(ngf * 8, ngf * 8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 8),
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf),
             nn.ReLU(True),
-            # state size. (ngf * 8) x 64 x 64
 
-            nn.ConvTranspose2d(ngf * 8, self.input_nc, 4, 2, 1, bias=False),
-            nn.ReLU(True),
+            nn.ConvTranspose2d(ngf, self.input_nc, 4, 2, 1, bias=False),
             nn.Tanh()
             # state size. (nc) x 128 x 128
         )
@@ -159,7 +153,7 @@ class _netG(nn.Module):
         h = self.decoder(z.view(z.size(0), z.size(1), 1, 1))
         # print("h", h.shape)
         # h size. 80, 3, 128, 128
-        h = h.view(int(h.size(0) / self.ntimestep), self.ntimestep,  self.input_nc, h.size(3), h.size(3))
+        h = h.view(int(h.size(0) / self.ntimestep), self.ntimestep, self.input_nc, h.size(3), h.size(3))
 
         z_category_labels = torch.from_numpy(z_category)
 
@@ -217,18 +211,14 @@ class _netD_V(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             # ndf * 2, d/4, 32, 32
 
-            nn.Conv3d(ndf * 2, ndf * 4, (1, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
+            nn.Conv3d(ndf * 2, ndf * 4, 4, stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
             nn.BatchNorm3d(ndf * 4),
             nn.LeakyReLU(0.2, inplace=True),
             # ndf * 4, d/8, 16, 16
 
-            nn.Conv3d(ndf * 4, ndf * 8, (1, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
-            nn.BatchNorm3d(ndf * 8),
-            nn.LeakyReLU(0.2, inplace=True),
-            # ndf * 8, d/8 8, 8
+            nn.Conv3d(ndf * 4, 1, (1, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
+            # 1, d/16, 8, 8
 
-            nn.Conv3d(ndf * 8, n_output_neurons, (1, 4, 4), 1, 0, bias=False),
-            # 1, d/8, 5, 5
         )
 
     def forward(self, input):

@@ -5,7 +5,7 @@ parser.add_argument('--dataset', required=True, type=str, help='name of your dat
 parser.add_argument('--dataroot', required=True, help='path to dataset.')
 parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
 parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
-parser.add_argument('--image_size', type=int, default=128, help='the height / width of the input image to network')
+parser.add_argument('--image_size', type=int, default=64, help='the height / width of the input image to network')
 parser.add_argument('--input_nc', type=int, default=3, help='input image channels')
 parser.add_argument('--output_nc', type=int, default=3, help='output image channels')
 parser.add_argument('--nz', type=int, default=100, help='latent vector z size')

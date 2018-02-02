@@ -123,7 +123,7 @@ class Trainer(object):
         valid_x_B = self._get_variable(valid_x_B).resize(self.video_batch_size * 10, self.n_channels, self.image_size, self.image_size)
         vutils.save_image(valid_x_B.data, '{}/valid_gif.png'.format(self.log_folder), nrow=10, normalize=True)
 
-        batch_num = 0
+
         for epoch in range(self.train_batches):
 
             for step, (realIm, realGif) in enumerate(itertools.izip(self.train_loader_A, self.train_loader_B)):
@@ -150,9 +150,14 @@ class Trainer(object):
                 #self.image_reconstructor.zero_grad()
                 #self.video_reconstructor.zero_grad()
 
+                video_batch_size = realGif.size(0)
+                image_batch_size = realIm.size(0)
+                # print(video_batch_size)
+                # print(image_batch_size)
+
                 #### train with gif
                 # GAN loss: D_A(G_A(A))
-                fake = (self.generator.sample_videos(realIm, self.video_batch_size), self.generator.sample_images(realIm, self.image_batch_size))
+                fake = (self.generator.sample_videos(realIm, video_batch_size), self.generator.sample_images(realIm, image_batch_size))
                 fakeGif, fake_categ = fake[0][0], fake[0][1]
                 # print("fakeM",fakeGif.shape)
                 # print("fakecateg", fake_categ.shape)
@@ -221,9 +226,12 @@ class Trainer(object):
 
 
                 if step % 30 == 0:
+
                     fake = (self.generator.sample_videos(valid_x_A, self.video_batch_size), self.generator.sample_images(valid_x_A, self.image_batch_size))
 
-                    fakeGif = fake[0][0].resize(self.video_batch_size * 10, self.n_channels, self.image_size, self.image_size)
+                    fakeGif = fake[0][0].permute(0,2,1,3,4)
+                    fakeGif = fakeGif.resize(self.video_batch_size * 10, self.n_channels, self.image_size,
+                                                self.image_size)
                     vutils.save_image(denorm(fakeGif.data), '%s/fakeGif_AB_%03d_%d.png' % (self.log_folder, epoch, step), nrow=10)
 
                     fakeIm = fake[1][0].resize(self.image_batch_size, self.n_channels, self.image_size,
