@@ -214,7 +214,7 @@ class VideoGenerator(nn.Module):
             nn.Tanh()
         )
 
-        self.encoder = nn.Sequential(
+        self.encoder_motion = nn.Sequential(
             nn.Conv2d(self.n_channels, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.LeakyReLU(0.2, inplace=True),
@@ -226,14 +226,23 @@ class VideoGenerator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(ngf * 4, ngf * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 8), 
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-
-        self.encoder_motion = nn.Sequential(
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(ngf * 8, dim_z_motion, 4, 1, 0, bias=False)
         )
 
         self.encoder_content = nn.Sequential(
+            nn.Conv2d(self.n_channels, ngf, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ngf, ngf * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ngf * 2, ngf * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ngf * 4, ngf * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 8), 
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(ngf * 8, dim_z_content, 4, 1, 0, bias=False)
         )
 
@@ -242,8 +251,7 @@ class VideoGenerator(nn.Module):
 
         #h_t = [self.get_gru_initial_state(num_samples)]
         
-        motion = self.encoder(image_batches)
-        motion = self.encoder_motion(motion).view(num_samples, self.dim_z_motion)
+        motion = self.encoder_motion(image_batches).view(num_samples, self.dim_z_motion)
         h_t = [motion]
 
         for frame_num in range(video_len):
@@ -274,8 +282,7 @@ class VideoGenerator(nn.Module):
         video_len = video_len if video_len is not None else self.video_length
 
         #content = np.random.normal(0, 1, (num_samples, self.dim_z_content)).astype(np.float32)
-        content = self.encoder(image_batches)
-        content = self.encoder_content(content)
+        content = self.encoder_content(image_batches)
         content = content.data.view(num_samples, self.dim_z_content)
         content = torch.cat([content] * 10)
         #content = torch.from_numpy(content)
@@ -287,7 +294,7 @@ class VideoGenerator(nn.Module):
         z_content = self.sample_z_content(image_batches, num_samples, video_len)
         
         z_category, z_category_labels = self.sample_z_categ(num_samples, video_len)
-
+        
         z_motion = self.sample_z_m(image_batches, num_samples, video_len)
         
         z = torch.cat([z_content, z_category, z_motion], dim=1)
@@ -305,7 +312,7 @@ class VideoGenerator(nn.Module):
         z_category_labels = torch.from_numpy(z_category_labels)
 
         if torch.cuda.is_available():
-            z_category_labels = z_category_labels.type(torch.LongTensor).cuda()
+            z_category_labels = z_category_labels.cuda()
 
         return h, Variable(z_category_labels, requires_grad=False)
 

@@ -1,73 +1,207 @@
+from __future__ import print_function
 import os
-from tqdm import tqdm
-from glob import glob
-from PIL import Image
+import tqdm
+import pickle
+import numpy as np
 import torch.utils.data
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
+from torchvision.datasets import ImageFolder
+from torchvision import transforms
+from torch.utils.data import DataLoader
+from PIL import Image
+import functools
 
-class Dataset(torch.utils.data.Dataset):
-    def __init__(self, root, image_size, domain):
-        self.root = root
-        self.domain = domain
-        self.image_size = image_size
-        if not os.path.exists(self.root):
-            raise Exception("[!] {} not exists.".format(self.root))
 
-        self.paths = glob(os.path.join(self.root, '*.' + self.domain))
-        if len(self.paths) == 0:
-            if self.domain == "jpg":
-                paths = glob(os.path.join(self.root, '*'))
-                paths.sort()
+class VideoFolderDataset(torch.utils.data.Dataset):
+    def __init__(self, folder, cache, min_len=10):
+        dataset = ImageFolder(folder)
+        self.total_frames = 0
+        self.lengths = []
+        self.images = []
 
-                for path in tqdm(paths):
-                    inGif = Image.open(path)
+        for idx, (im, categ) in enumerate(
+                tqdm.tqdm(dataset, desc="Counting total number of frames")):
+            img_path, _ = dataset.imgs[idx]
+            shorter, longer = min(im.width, im.height), max(im.width, im.height)
+            length = longer // shorter
+            if length >= min_len:
+                self.images.append((img_path, categ))
+                self.lengths.append(length)
 
-                    first_frame = inGif.convert("RGB")
 
-                    # print(path[:-4] + '.jpg')
-                    first_frame.save(path[:-4] + '.jpg')
-            raise Exception("No images are found in {}".format(self.root))
+        self.cumsum = np.cumsum([0] + self.lengths)
+        print ("Total number of frames {}".format(np.sum(self.lengths)))
 
-        self.transform = transforms.Compose([
-            transforms.Resize(image_size), 
-            transforms.CenterCrop(image_size), 
-            transforms.ToTensor(), 
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        ])
-
-    def __getitem__(self, index):
-        if self.domain == 'gif':
-            outImgs = []
-            inGif = Image.open(self.paths[index])
-            nframes = 0
-            while inGif:
-                outImgs.append(self.transform(inGif.convert("RGB")))
-                nframes += 1
-                try:
-                    inGif.seek(nframes)
-                except EOFError:
-                    break
-            output = torch.cat(outImgs)
-            return output
-        else:
-            inJpg = Image.open(self.paths[index]).convert("RGB")
-            return self.transform(inJpg)
+    def __getitem__(self, item):
+        path, label = self.images[item]
+        im = Image.open(path)
+        return im, label
 
     def __len__(self):
-        return len(self.paths)
-
-def get_loader(dataroot, batch_size, image_size, num_workers, shuffle=True):
-    A_dataset = Dataset(dataroot, image_size, domain="jpg")
-    B_dataset = Dataset(dataroot, image_size, domain="gif")
-
-    A_dataloader = torch.utils.data.DataLoader(A_dataset, batch_size=batch_size
-                                             ,shuffle=True, num_workers=num_workers)
-    B_dataloader = torch.utils.data.DataLoader(B_dataset, batch_size=batch_size
-                                             ,shuffle=True, num_workers=num_workers)
-
-    return A_dataloader, B_dataloader
+        return len(self.images)
 
 
+class ImageDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset, transform=None):
+        self.dataset = dataset
+
+        self.transforms = transform if transform is not None else lambda x: x
+
+    def __getitem__(self, item):
+        if item != 0:
+            video_id = np.searchsorted(self.dataset.cumsum, item) - 1
+            frame_num = item - self.dataset.cumsum[video_id] - 1
+        else:
+            video_id = 0
+            frame_num = 0
+
+        video, target = self.dataset[video_id]
+        video = np.array(video)
+
+        horizontal = video.shape[1] > video.shape[0]
+
+        if horizontal:
+            i_from, i_to = video.shape[0] * frame_num, video.shape[0] * (frame_num + 1)
+            frame = video[:, i_from: i_to, ::]
+        else:
+            i_from, i_to = video.shape[1] * frame_num, video.shape[1] * (frame_num + 1)
+            frame = video[i_from: i_to, :, ::]
+
+        if frame.shape[0] == 0:
+            print ("video {}. From {} to {}. num {}".format(video.shape, i_from, i_to, item))
+        return {"images": self.transforms(frame), "categories": target}
+
+    def __len__(self):
+        return self.dataset.cumsum[-1]
 
 
+class VideoDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset, video_length, every_nth=1, transform=None):
+        self.dataset = dataset
+        self.video_length = video_length
+        self.every_nth = every_nth
+        self.transforms = transform if transform is not None else lambda x: x
+
+    def __getitem__(self, item):
+        video, target = self.dataset[item]
+        video = np.array(video)
+
+        horizontal = video.shape[1] > video.shape[0]
+        shorter, longer = min(video.shape[0], video.shape[1]), max(video.shape[0], video.shape[1])
+        video_len = longer // shorter
+
+        # videos can be of various length, we randomly sample sub-sequences
+        if video_len > self.video_length * self.every_nth:
+            needed = self.every_nth * (self.video_length - 1)
+            gap = video_len - needed
+            start = 0 if gap == 0 else np.random.randint(0, gap, 1)[0]
+            subsequence_idx = np.linspace(start, start + needed, self.video_length, endpoint=True, dtype=np.int32)
+
+        elif video_len >= self.video_length:
+            subsequence_idx = np.arange(0, self.video_length)
+        else:
+            raise Exception("Length is too short id - {}, len - {}").format(self.dataset[item], video_len)
+
+        frames = np.split(video, video_len, axis=1 if horizontal else 0)
+        selected = np.array([frames[s_id] for s_id in subsequence_idx])
+
+        return {"images": self.transforms(selected), "categories": target}
+
+    def __len__(self):
+        return len(self.dataset)
+
+
+class ImageSampler(torch.utils.data.Dataset):
+    def __init__(self, dataset, transform=None):
+        self.dataset = dataset
+        self.transforms = transform
+
+    def __getitem__(self, index):
+        result = {}
+        for k in self.dataset.keys:
+            result[k] = np.take(self.dataset.get_data()[k], index, axis=0)
+
+        if self.transforms is not None:
+            for k, transform in self.transforms.iteritems():
+                result[k] = transform(result[k])
+
+        return result
+
+    def __len__(self):
+        return self.dataset.get_data()[self.dataset.keys[0]].shape[0]
+
+
+class VideoSampler(torch.utils.data.Dataset):
+    def __init__(self, dataset, video_length, every_nth=1, transform=None):
+        self.dataset = dataset
+        self.video_length = video_length
+        self.unique_ids = np.unique(self.dataset.get_data()['video_ids'])
+        self.every_nth = every_nth
+        self.transforms = transform
+
+    def __getitem__(self, item):
+        result = {}
+        ids = self.dataset.get_data()['video_ids'] == self.unique_ids[item]
+        ids = np.squeeze(np.squeeze(np.argwhere(ids)))
+        for k in self.dataset.keys:
+            result[k] = np.take(self.dataset.get_data()[k], ids, axis=0)
+
+        subsequence_idx = None
+        print (result[k].shape[0])
+
+        # videos can be of various length, we randomly sample sub-sequences
+        if result[k].shape[0] > self.video_length:
+            needed = self.every_nth * (self.video_length - 1)
+            gap = result[k].shape[0] - needed
+            start = 0 if gap == 0 else np.random.randint(0, gap, 1)[0]
+            subsequence_idx = np.linspace(start, start + needed, self.video_length, endpoint=True, dtype=np.int32)
+        elif result[k].shape[0] == self.video_length:
+            subsequence_idx = np.arange(0, self.video_length)
+        else:
+            print ("Length is too short id - {}, len - {}".format(self.unique_ids[item], result[k].shape[0]))
+
+        if subsequence_idx:
+            for k in self.dataset.keys:
+                result[k] = np.take(result[k], subsequence_idx, axis=0)
+        else:
+            print (result[self.dataset.keys[0]].shape)
+
+        if self.transforms is not None:
+            for k, transform in self.transforms.iteritems():
+                result[k] = transform(result[k])
+
+        return result
+
+    def __len__(self):
+        return len(self.unique_ids)
+
+def video_transform(video, image_transform):
+    # apply image transform to every frame in a video
+    vid = []
+    for im in video:
+        vid.append(image_transform(im))
+
+    vid = torch.stack(vid).permute(1, 0, 2, 3)
+
+    return vid
+
+def get_loader(dataroot, cache, image_size, n_channels, image_batch, video_batch, video_length):
+
+    image_transforms = transforms.Compose([
+        Image.fromarray,
+        transforms.Scale(image_size),
+        transforms.ToTensor(),
+        lambda x: x[:n_channels, ::],
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ])
+
+    video_transforms = functools.partial(video_transform, image_transform=image_transforms)
+
+    dataset = VideoFolderDataset(dataroot, cache)
+    
+    image_dataset = ImageDataset(dataset, image_transforms)
+    video_dataset = VideoDataset(dataset, video_length, 2, video_transforms)
+
+    image_loader = DataLoader(image_dataset, batch_size=image_batch, drop_last=True, shuffle=True)
+    video_loader = DataLoader(video_dataset, batch_size=video_batch, drop_last=True, shuffle=True)
+
+    return image_loader, video_loader

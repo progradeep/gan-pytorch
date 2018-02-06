@@ -22,8 +22,8 @@ class Trainer(object):
         self.image_loader = image_loader
         self.video_loader = video_loader
 
-        self.train_loader_A = image_loader
-        self.train_loader_B = video_loader
+        # self.train_loader_A = image_loader
+        # self.train_loader_B = video_loader
 
         self.image_size = int(config.image_size)
         self.n_channels = int(config.n_channels)
@@ -46,8 +46,8 @@ class Trainer(object):
         self.use_infogan = config.use_infogan
         self.use_categories = config.use_categories
 
-        self.image_batch_size = self.train_loader_A.batch_size
-        self.video_batch_size = self.train_loader_B.batch_size
+        self.image_batch_size = self.image_loader.batch_size
+        self.video_batch_size = self.video_loader.batch_size
 
         self.log_interval = int(config.log_interval)
         self.checkpoint_step = int(config.checkpoint_step)
@@ -132,8 +132,9 @@ class Trainer(object):
 
 
     def train(self):
+        self.gan_criterion = nn.BCEWithLogitsLoss()
         BCELoss = nn.BCEWithLogitsLoss()
-        CrossEntropyLoss = nn.CrossEntropyLoss()
+        self.category_criterion = nn.CrossEntropyLoss()
 
         if self.use_cuda:
             self.generator.cuda()
@@ -150,7 +151,9 @@ class Trainer(object):
 
         A_loader, B_loader = iter(self.image_loader), iter(self.video_loader)
         valid_x_A, valid_x_B = A_loader.next(), B_loader.next()
-
+        valid_x_A = valid_x_A["images"]
+        valid_x_B = valid_x_B["images"]
+        print(valid_x_B.shape)
         valid_x_A = self._get_variable(valid_x_A).resize(self.image_batch_size, self.n_channels, self.image_size, self.image_size)
         vutils.save_image(valid_x_A.data, '{}/valid_im.png'.format(self.outf), nrow=1, normalize=True)
 
@@ -161,7 +164,20 @@ class Trainer(object):
 
         for epoch in range(self.train_batches):
 
-            for step, (realIm, realGif) in enumerate(itertools.izip(self.train_loader_A, self.train_loader_B)):
+            for step in range(len(self.video_loader)):
+                try:
+                    realIm, realGif = A_loader.next(), B_loader.next()
+                    realGif, realIm = realGif["images"], realIm["images"]
+                except StopIteration:
+                    A_loader, B_loader = iter(self.image_loader), iter(self.video_loader)
+                    realIm, realGif = A_loader.next(), B_loader.next()
+                    realGif, realIm = realGif["images"], realIm["images"]
+
+                if realIm.size(0) != realGif.size(0):
+                    print("[!] Sampled dataset from A and B have different # of data. Try resampling...")
+                    continue
+
+
                 realGif = realGif.view(-1, 10, self.n_channels, self.image_size, self.image_size)
                 realGif = realGif.permute(0,2,1,3,4)
 
@@ -169,6 +185,7 @@ class Trainer(object):
 
                 video_batch_size = realGif.size(0)
                 image_batch_size = realIm.size(0)
+                print(video_batch_size, image_batch_size)
 
                 ############################
                 # (1) Update G network: minimize Lgan(MSE) + Lcycle(L1)
@@ -180,27 +197,26 @@ class Trainer(object):
 
                 #### train with gif
                 # GAN loss: D_A(G_A(A))
-                fake = (self.generator.sample_videos(realIm, video_batch_size), self.generator.sample_images(realIm, image_batch_size))
+                fake = (self.generator.sample_videos(realIm, image_batch_size), self.generator.sample_images(realIm, image_batch_size))
                 fakeGif, fake_categ = fake[0][0], fake[0][1]
+                # fakeCateg size. (8)
 
-                out = self.video_discriminator(fakeGif)
-                output, outcateg = out[0], out[1]
+                output = self.video_discriminator(fakeGif)[0] 
                 loss_G = BCELoss(output, Variable(torch.ones(output.size()).cuda()))
 
-                # firt frame - real image
-                firstframe = fakeGif[:,:,0,:,:].squeeze()
-                loss_G += torch.mean(torch.abs(firstframe - realIm))
-
-                # infogan loss
-                loss_G += (CrossEntropyLoss(outcateg.squeeze(), fake_categ) * 10)
-
+                #recon = self.video_reconstructor(fakeGif)
+                #loss_G += torch.mean(torch.abs(recon - realIm))
+                for i in range(10):
+                    loss_G += 1000 * (10 - i) * torch.mean(torch.abs(fakeGif[:, :, i, :, :] - realIm))
 
                 #### train with image
-                # GAN loss
                 fakeIm = fake[1][0]
+
                 output = self.image_discriminator(fakeIm)[0]
                 loss_G += BCELoss(output, Variable(torch.ones(output.size()).cuda()))
 
+                #recon = self.image_reconstructor(fakeIm)
+                #loss_G += torch.mean(torch.abs(recon - realIm))
 
                 loss_G.backward()
                 opt_generator.step()
@@ -243,7 +259,7 @@ class Trainer(object):
 
                 print('[%d/%d][%d/%d] - time: %.2f, loss_D_V: %.3f, loss_D_I: %.3f, '
                       'loss_G: %.3f'
-                      % (epoch, self.train_batches, step, len(self.train_loader_A), step_end_time - start_time,
+                      % (epoch, self.train_batches, step, len(self.video_loader), step_end_time - start_time,
                          loss_D_V, loss_D_I, loss_G))
 
 
@@ -264,8 +280,8 @@ class Trainer(object):
                    torch.save(self.generator.state_dict(), '%s/netG_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
                    torch.save(self.video_discriminator.state_dict(), '%s/netD_V_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
                    torch.save(self.image_discriminator.state_dict(), '%s/netD_I_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                   # torch.save(self.image_reconstructor.state_dict(), '%s/ImageRecon_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                   # torch.save(self.video_reconstructor.state_dict(), '%s/VideoRecon_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                   torch.save(self.image_reconstructor.state_dict(), '%s/ImageRecon_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                   torch.save(self.video_reconstructor.state_dict(), '%s/VideoRecon_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
 
                    print("Saved checkpoint")
 
