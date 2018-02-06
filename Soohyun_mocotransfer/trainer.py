@@ -185,7 +185,6 @@ class Trainer(object):
 
                 video_batch_size = realGif.size(0)
                 image_batch_size = realIm.size(0)
-                print(video_batch_size, image_batch_size)
 
                 ############################
                 # (1) Update G network: minimize Lgan(MSE) + Lcycle(L1)
