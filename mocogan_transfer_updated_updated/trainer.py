@@ -188,8 +188,10 @@ class Trainer(object):
                 output = self.video_discriminator(fakeGif)[0] 
                 loss_G = BCELoss(output, Variable(torch.ones(output.size()).cuda()))
 
-                recon = self.video_reconstructor(fakeGif)
-                loss_G += torch.mean(torch.abs(recon - realIm))
+                #recon = self.video_reconstructor(fakeGif)
+                #loss_G += torch.mean(torch.abs(recon - realIm))
+                for i in range(10):
+                    loss_G += 1000 * (10 - i) * torch.mean(torch.abs(fakeGif[:, :, i, :, :] - realIm))
 
                 #### train with image
                 fakeIm = fake[1][0]
@@ -197,8 +199,8 @@ class Trainer(object):
                 output = self.image_discriminator(fakeIm)[0]
                 loss_G += BCELoss(output, Variable(torch.ones(output.size()).cuda()))
 
-                recon = self.image_reconstructor(fakeIm)
-                loss_G += torch.mean(torch.abs(recon - realIm))
+                #recon = self.image_reconstructor(fakeIm)
+                #loss_G += torch.mean(torch.abs(recon - realIm))
 
                 loss_G.backward()
                 opt_generator.step()
