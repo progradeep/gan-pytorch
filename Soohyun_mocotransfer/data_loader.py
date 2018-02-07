@@ -84,6 +84,7 @@ class VideoDataset(torch.utils.data.Dataset):
     def __getitem__(self, item):
         video, target = self.dataset[item]
         video = np.array(video)
+        # video. 96 x 96 * 16 x 3
 
         horizontal = video.shape[1] > video.shape[0]
         shorter, longer = min(video.shape[0], video.shape[1]), max(video.shape[0], video.shape[1])
@@ -97,12 +98,15 @@ class VideoDataset(torch.utils.data.Dataset):
             subsequence_idx = np.linspace(start, start + needed, self.video_length, endpoint=True, dtype=np.int32)
 
         elif video_len >= self.video_length:
-            subsequence_idx = np.arange(0, self.video_length)
+            subsequence_idx = np.linspace(0, video_len-1, self.video_length, dtype=np.int32)
         else:
             raise Exception("Length is too short id - {}, len - {}").format(self.dataset[item], video_len)
 
+        # video. 96 x 96 * 16 x 3
         frames = np.split(video, video_len, axis=1 if horizontal else 0)
+        # frames. 16 x 96 x 96 x 3
         selected = np.array([frames[s_id] for s_id in subsequence_idx])
+        # selected. 10 x 96 x 96 x 3
 
         return {"images": self.transforms(selected), "categories": target}
 
@@ -180,8 +184,10 @@ def video_transform(video, image_transform):
     for im in video:
         vid.append(image_transform(im))
 
-    vid = torch.stack(vid).permute(1, 0, 2, 3)
-
+    vid = torch.stack(vid)
+    # vid. 10, 3, 64, 64
+    vid = vid.permute(1, 0, 2, 3)
+    # vid. 3, 10, 64, 64
     return vid
 
 def get_loader(dataroot, cache, image_size, n_channels, image_batch, video_batch, video_length):
@@ -190,7 +196,7 @@ def get_loader(dataroot, cache, image_size, n_channels, image_batch, video_batch
         Image.fromarray,
         transforms.Scale(image_size),
         transforms.ToTensor(),
-        lambda x: x[:n_channels, ::],
+        # lambda x: x[:n_channels, ::],
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
 
