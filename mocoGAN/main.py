@@ -29,9 +29,9 @@ def main(config):
     cudnn.benchmark = True
 
     # dataroot, cache, image_size, n_channels, image_batch, video_batch, video_length):
-    image_loader, video_loader = get_loader(dataroot=config.dataroot, cache=os.path.join(config.dataroot, 'local.pkl'),
-                                            image_size=int(config.image_size), n_channels=int(config.n_channels),
-                                            image_batch=int(config.image_batch), video_batch=int(config.video_batch), video_length=int(config.video_length))
+    image_loader, video_loader = get_loader(dataroot=config.dataroot, image_size=int(config.image_size),
+                                            n_channels=int(config.n_channels), image_batch=int(config.image_batch),
+                                            video_batch=int(config.video_batch), video_length=int(config.video_length))
 
     trainer = Trainer(config, image_loader, video_loader)
 

@@ -10,7 +10,7 @@ import torchvision.utils as vutils
 from torch.autograd import Variable
 import torch.optim as optim
 
-from models import mocogan_z as mocogan
+from models import mocogan as mocogan
 
 def denorm(x):
     out = (x + 1) / 2
@@ -21,9 +21,6 @@ class Trainer(object):
         self.config = config
         self.image_loader = image_loader
         self.video_loader = video_loader
-
-        # self.train_loader_A = image_loader
-        # self.train_loader_B = video_loader
 
         self.image_size = int(config.image_size)
         self.n_channels = int(config.n_channels)
@@ -55,9 +52,6 @@ class Trainer(object):
 
         self.use_cuda = config.cuda
 
-        self.image_enumerator = None
-        self.video_enumerator = None
-
         self.outf = config.outf
 
         self.build_model()
@@ -83,32 +77,27 @@ class Trainer(object):
         steps = [int(path.split('.')[-2].split('_')[-1].split('-')[-1]) for path in paths]
         self.start_step = str(max(steps))
 
-
         G_filename = '{}/netG_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
         D_V_filename = '{}/netD_V_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
         D_I_filename = '{}/netD_I_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
-        # Im_Recon_filename = '{}/ImageRecon_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
-        # Video_Recon_filename = '{}/VideoRecon_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+        Im_Recon_filename = '{}/ImageRecon_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+        Video_Recon_filename = '{}/VideoRecon_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
 
         self.generator.load_state_dict(torch.load(G_filename))
         self.video_discriminator.load_state_dict(torch.load(D_V_filename))
         self.image_discriminator.load_state_dict(torch.load(D_I_filename))
-        # self.image_reconstructor.load_state_dict(torch.load(Im_Recon_filename))
-        # self.video_reconstructor.load_state_dict(torch.load(Video_Recon_filename))
-
+        self.image_reconstructor.load_state_dict(torch.load(Im_Recon_filename))
+        self.video_reconstructor.load_state_dict(torch.load(Video_Recon_filename))
 
         print("[*] Model loaded: {}".format(G_filename))
         print("[*] Model loaded: {}".format(D_V_filename))
         print("[*] Model loaded: {}".format(D_I_filename))
-        # print("[*] Model loaded: {}".format(Im_Recon_filename))
-        # print("[*] Model loaded: {}".format(Video_Recon_filename))
+        print("[*] Model loaded: {}".format(Im_Recon_filename))
+        print("[*] Model loaded: {}".format(Video_Recon_filename))
+
 
     def build_model(self):
-        # n_channels, dim_z_content, dim_z_category, dim_z_motion, video_length,
         self.generator = mocogan.VideoGenerator(self.n_channels, self.dim_z_content, self.dim_z_category, self.dim_z_motion, self.video_length)
-
-        # self.image_reconstructor = mocogan.ImageReconstructor(self.n_channels, self.dim_z_content + self.dim_z_category + self.dim_z_motion)
-        # self.video_reconstructor = mocogan.VideoReconstructor(self.n_channels, self.video_length, self.dim_z_content + self.dim_z_category, self.dim_z_motion)
 
         self.image_discriminator = self.build_discriminator(self.image_discriminator, n_channels=self.n_channels,
                                                         use_noise=self.use_noise, noise_sigma=self.noise_sigma)
@@ -116,6 +105,13 @@ class Trainer(object):
         self.video_discriminator = self.build_discriminator(self.video_discriminator, dim_categorical=self.dim_z_category,
                                                         n_channels=self.n_channels, use_noise=self.use_noise,
                                                         noise_sigma=self.noise_sigma)
+
+        self.image_reconstructor = mocogan.ImageReconstructor(self.n_channels,
+                                                              self.dim_z_content + self.dim_z_category + self.dim_z_motion)
+
+        self.video_reconstructor = mocogan.VideoReconstructor(self.n_channels, self.video_length,
+                                                              self.dim_z_content + self.dim_z_category,
+                                                              self.dim_z_motion)
 
         if self.outf != None:
             self.load_model()
@@ -138,6 +134,8 @@ class Trainer(object):
             self.generator.cuda()
             self.image_discriminator.cuda()
             self.video_discriminator.cuda()
+            self.image_reconstructor.cuda()
+            self.video_reconstructor.cuda()
 
         # create optimizers
         opt_generator = optim.Adam(self.generator.parameters(), lr=self.lr, betas=(self.beta1, self.beta2), weight_decay=self.weight_decay)
@@ -165,26 +163,18 @@ class Trainer(object):
             for step in range(len(self.video_loader)):
                 try:
                     realIm, realGif = A_loader.next(), B_loader.next()
-                    realGifCateg, realImCateg = realGif["categories"], realIm["images"]
+                    realGifCateg, realImCateg = realGif["categories"], realIm["categories"]
                     realGif, realIm = realGif["images"], realIm["images"]
 
                 except StopIteration:
                     A_loader, B_loader = iter(self.image_loader), iter(self.video_loader)
                     realIm, realGif = A_loader.next(), B_loader.next()
-                    realGifCateg, realImCateg = realGif["categories"], realIm["images"]
+                    realGifCateg, realImCateg = realGif["categories"], realIm["categories"]
                     realGif, realIm = realGif["images"], realIm["images"]
 
                 if realIm.size(0) != realGif.size(0):
                     print("[!] Sampled dataset from A and B have different # of data. Try resampling...")
                     continue
-
-                # realGif. 10 x 3 x 10 x 64 x 64
-                # realGif = realGif.permute(0, 2, 1, 3, 4)
-                #
-                # a = self._get_variable(realGif).resize(self.video_batch_size * self.video_length,
-                #                                                  self.n_channels, self.image_size, self.image_size)
-                # vutils.save_image(a.data, '{}/a.png'.format(self.outf), nrow=self.video_length,
-                #                   normalize=True)
 
 
                 realIm, realGif = Variable(realIm.cuda(), requires_grad=False), Variable(realGif.cuda(), requires_grad=False)
@@ -196,23 +186,31 @@ class Trainer(object):
                 ###########################
                 self.generator.zero_grad()
 
-
                 #### train with gif
                 # GAN loss: D_A(G_A(A))
-                fake = (self.generator.sample_videos(image_batch_size), self.generator.sample_images(image_batch_size))
+                fake = (self.generator.sample_videos(realIm, image_batch_size), self.generator.sample_images(realIm, image_batch_size))
                 fakeGif, generated_categ = fake[0][0], fake[0][1]
 
                 output, fake_categ = self.video_discriminator(fakeGif)
                 loss_G = self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
+                if self.config.use_reconstruct:
+                    recon = self.video_reconstructor(fakeGif)
+                    loss_G += torch.mean(torch.abs(recon - realIm))
+
                 if self.config.use_infogan:
                     loss_G += self.category_criterion(fake_categ.squeeze(), generated_categ)
+
 
                 #### train with image
                 fakeIm = fake[1][0]
 
                 output, fake_categ = self.image_discriminator(fakeIm)
                 loss_G += self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
+
+                if self.config.use_reconstruct:
+                    recon = self.image_reconstructor(fakeIm)
+                    loss_G += torch.mean(torch.abs(recon - realIm))
 
                 loss_G.backward()
                 opt_generator.step()
@@ -255,12 +253,11 @@ class Trainer(object):
 
                 loss_D_I = loss_D_real + loss_D_fake
 
-
-
                 loss_D_I.backward()
                 opt_image_discriminator.step()
 
                 step_end_time = time.time()
+
 
                 print('[%d/%d][%d/%d] - time: %.2f, loss_D_V: %.3f, loss_D_I: %.3f, '
                       'loss_G: %.3f'
@@ -269,7 +266,7 @@ class Trainer(object):
 
 
                 if step % self.log_interval == 0:
-                    fake = (self.generator.sample_videos(self.image_batch_size), self.generator.sample_images(self.image_batch_size))
+                    fake = (self.generator.sample_videos(valid_x_A, self.image_batch_size), self.generator.sample_images(valid_x_A, self.image_batch_size))
                     fakeGif = fake[0][0]
                     fakeGif = fakeGif.permute(0, 2, 1, 3, 4)
                     fakeGif = fakeGif.resize(self.video_batch_size * self.video_length, self.n_channels, self.image_size, self.image_size)

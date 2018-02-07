@@ -12,7 +12,7 @@ import functools
 
 
 class VideoFolderDataset(torch.utils.data.Dataset):
-    def __init__(self, folder, cache, min_len=10):
+    def __init__(self, folder, min_len=10):
         dataset = ImageFolder(folder)
         self.total_frames = 0
         self.lengths = []
@@ -190,7 +190,7 @@ def video_transform(video, image_transform):
     # vid. 3, 10, 64, 64
     return vid
 
-def get_loader(dataroot, cache, image_size, n_channels, image_batch, video_batch, video_length):
+def get_loader(dataroot, image_size, n_channels, image_batch, video_batch, video_length):
 
     image_transforms = transforms.Compose([
         Image.fromarray,
@@ -202,7 +202,7 @@ def get_loader(dataroot, cache, image_size, n_channels, image_batch, video_batch
 
     video_transforms = functools.partial(video_transform, image_transform=image_transforms)
 
-    dataset = VideoFolderDataset(dataroot, cache)
+    dataset = VideoFolderDataset(dataroot)
     
     image_dataset = ImageDataset(dataset, image_transforms)
     video_dataset = VideoDataset(dataset, video_length, 2, video_transforms)
