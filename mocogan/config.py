@@ -21,7 +21,7 @@ parser.add_argument('--noise_sigma', type=float, default=0, help='when use_noise
 parser.add_argument('--image_discriminator', default='PatchImageDiscriminator', help='specifies image disciminator type (see mocogan.py for a list of available models')
 parser.add_argument('--video_discriminator', default='CategoricalVideoDiscriminator', help='specifies video discriminator type (see mocogan.py for a list of available models')
 
-parser.add_argument('--video_length', type=int, default=10, help='length of the video')
+parser.add_argument('--video_length', type=int, default=16, help='length of the video')
 parser.add_argument('--print_every', type=int, default=100, help='print every iterations')
 parser.add_argument('--n_channels', type=int, default=3, help='number of channels in the input data')
 

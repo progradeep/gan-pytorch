@@ -191,7 +191,7 @@ class Trainer(object):
                 #recon = self.video_reconstructor(fakeGif)
                 #loss_G += torch.mean(torch.abs(recon - realIm))
                 for i in range(10):
-                    loss_G += 1000 * (10 - i) * torch.mean(torch.abs(fakeGif[:, :, i, :, :] - realIm))
+                    loss_G += 100000 * (10 - i) * torch.mean(torch.abs(fakeGif[:, :, i, :, :] - realIm))
 
                 #### train with image
                 fakeIm = fake[1][0]

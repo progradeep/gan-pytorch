@@ -280,10 +280,10 @@ class Trainer(object):
                 videos, _ = sample_fake_video_batch(self.video_batch_size)
 
                 vutils.save_image(denorm(images.data),
-                        '%s/image_samples_epoch_%05d.png' % (self.log_folder, batch_num), nrow=10)
-                videos.data.resize_(self.video_batch_size * 10, 3, 64, 64)
+                        '%s/image_samples_epoch_%05d.png' % (self.log_folder, batch_num), nrow=16)
+                videos.data.resize_(self.video_batch_size * 16, 3, 64, 64)
                 vutils.save_image(denorm(videos.data),
-                        '%s/video_samples_epoch_%05d.png' % (self.log_folder, batch_num), nrow=10)
+                        '%s/video_samples_epoch_%05d.png' % (self.log_folder, batch_num), nrow=16)
 
                 torch.save(self.generator, os.path.join(self.log_folder, 'generator_%05d.pytorch' % batch_num))
 
