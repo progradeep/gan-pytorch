@@ -10,9 +10,9 @@ parser.add_argument('--video_batch', type=int, default=10, help='number of video
 
 parser.add_argument('--image_size', type=int, default=64, help='resize all frames to this size')
 
-parser.add_argument('--use_infogan', default=False, help='when specified infogan loss is used')
+parser.add_argument('--use_infogan', default=True, help='when specified infogan loss is used')
 
-parser.add_argument('--use_categories', default=False ,help='when specified ground truth categories are used to train CategoricalVideoDiscriminator')
+parser.add_argument('--use_categories', default=True ,help='when specified ground truth categories are used to train CategoricalVideoDiscriminator')
 
 parser.add_argument('--use_noise', help='when specified instance noise is used')
 

@@ -271,7 +271,7 @@ class VideoGenerator(nn.Module):
         h = self.main(z.view(z.size(0), z.size(1), 1, 1))
         h = h.view(int(h.size(0) / video_len), video_len, self.n_channels, h.size(3), h.size(3))
 
-        z_category_labels = torch.from_numpy(z_category_labels)
+        z_category_labels = torch.from_numpy(z_category_labels).type("torch.LongTensor")
 
         if torch.cuda.is_available():
             z_category_labels = z_category_labels.cuda()

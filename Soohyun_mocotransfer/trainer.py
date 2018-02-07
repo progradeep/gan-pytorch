@@ -165,10 +165,13 @@ class Trainer(object):
             for step in range(len(self.video_loader)):
                 try:
                     realIm, realGif = A_loader.next(), B_loader.next()
+                    realGifCateg, realImCateg = realGif["categories"], realIm["images"]
                     realGif, realIm = realGif["images"], realIm["images"]
+
                 except StopIteration:
                     A_loader, B_loader = iter(self.image_loader), iter(self.video_loader)
                     realIm, realGif = A_loader.next(), B_loader.next()
+                    realGifCateg, realImCateg = realGif["categories"], realIm["images"]
                     realGif, realIm = realGif["images"], realIm["images"]
 
                 if realIm.size(0) != realGif.size(0):
@@ -232,7 +235,7 @@ class Trainer(object):
                 loss_D_V = loss_D_real + loss_D_fake
 
                 if self.config.use_categories:
-                    categories_gt = Variable(torch.squeeze(realGif['categories'].long()), requires_grad=False)
+                    categories_gt = Variable(torch.squeeze(realGifCateg.long()), requires_grad=False).cuda()
                     loss_D_V += self.category_criterion(real_categ.squeeze(), categories_gt)
 
                 loss_D_V.backward()
@@ -243,18 +246,16 @@ class Trainer(object):
                 # train with real
                 self.image_discriminator.zero_grad()
 
-                D_real, real_categ = self.image_discriminator(realIm)
+                D_real = self.image_discriminator(realIm)[0]
                 loss_D_real = self.gan_criterion(D_real, Variable(torch.ones(D_real.size()).cuda()))
 
                 # train with fake
-                D_fake, fake_categ = self.image_discriminator(fakeIm.detach())
+                D_fake = self.image_discriminator(fakeIm.detach())[0]
                 loss_D_fake = self.gan_criterion(D_fake, Variable(torch.zeros(D_fake.size()).cuda()))
 
                 loss_D_I = loss_D_real + loss_D_fake
 
-                if self.config.use_categories:
-                    categories_gt = Variable(torch.squeeze(realIm['categories'].long()), requires_grad=False)
-                    loss_D_I += self.category_criterion(real_categ.squeeze(), categories_gt)
+
 
                 loss_D_I.backward()
                 opt_image_discriminator.step()
