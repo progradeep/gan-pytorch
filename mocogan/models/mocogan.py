@@ -137,25 +137,25 @@ class VideoDiscriminator(nn.Module):
 
         self.main = nn.Sequential(
             Noise(use_noise, sigma=noise_sigma),
-            nn.Conv3d(n_channels, ndf, (3, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
+            nn.Conv3d(n_channels, ndf, (4, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
             nn.LeakyReLU(0.2, inplace=True),
 
             Noise(use_noise, sigma=noise_sigma),
-            nn.Conv3d(ndf, ndf * 2, (3, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
+            nn.Conv3d(ndf, ndf * 2, (4, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
             nn.BatchNorm3d(ndf * 2),
             nn.LeakyReLU(0.2, inplace=True),
 
             Noise(use_noise, sigma=noise_sigma),
-            nn.Conv3d(ndf * 2, ndf * 4, (3, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
+            nn.Conv3d(ndf * 2, ndf * 4, (4, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
             nn.BatchNorm3d(ndf * 4),
             nn.LeakyReLU(0.2, inplace=True),
 
             Noise(use_noise, sigma=noise_sigma),
-            nn.Conv3d(ndf * 4, ndf * 8, (3, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
+            nn.Conv3d(ndf * 4, ndf * 8, (4, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
             nn.BatchNorm3d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv3d(ndf * 8, n_output_neurons, (2, 4, 4), 1, 0, bias=False),
+            nn.Conv3d(ndf * 8, n_output_neurons, (4, 4, 4), 1, 0, bias=False),
         )
 
     def forward(self, input):
