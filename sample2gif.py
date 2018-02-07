@@ -3,10 +3,10 @@ import imageio
 import numpy as np
 from PIL import Image
 
-######################################################
+#########################################################
 # USAGE
 # python sample2gif.py --img_path fakeGif_AB_005_300.png
-######################################################
+#########################################################
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--img_path', required=True, help='path to image')
