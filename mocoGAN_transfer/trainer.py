@@ -194,6 +194,8 @@ class Trainer(object):
                 output, fake_categ = self.video_discriminator(fakeGif)
                 loss_G = self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
+                loss_G += 100 * torch.mean(torch.abs(fakeGif[:, :, 0, :, :] - realIm))
+
                 if self.config.use_reconstruct:
                     recon = self.video_reconstructor(fakeGif)
                     loss_G += torch.mean(torch.abs(recon - realIm))
