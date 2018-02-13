@@ -194,11 +194,11 @@ class Trainer(object):
                 output, fake_categ = self.video_discriminator(fakeGif)
                 loss_G = self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
-                loss_G += 10000 * torch.mean(torch.abs(fakeGif[:, :, 0, :, :] - realIm))
+                loss_G += 100 * torch.mean(torch.abs(fakeGif[:, :, 0, :, :] - realIm))
 
-                if self.config.use_reconstruct:
-                    recon = self.video_reconstructor(fakeGif)
-                    loss_G += torch.mean(torch.abs(recon - realIm))
+                #if self.config.use_reconstruct:
+                #    recon = self.video_reconstructor(fakeGif)
+                #    loss_G += torch.mean(torch.abs(recon - realIm))
 
                 if self.config.use_infogan:
                     loss_G += self.category_criterion(fake_categ.squeeze(), generated_categ)
@@ -208,7 +208,7 @@ class Trainer(object):
                 fakeIm = fake[1][0]
 
                 output, fake_categ = self.image_discriminator(fakeIm)
-                loss_G += self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
+                loss_G += 100 * self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
                 if self.config.use_reconstruct:
                     recon = self.image_reconstructor(fakeIm)

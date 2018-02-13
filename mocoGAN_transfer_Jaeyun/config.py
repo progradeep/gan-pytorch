@@ -8,11 +8,11 @@ parser.add_argument('--image_dataset', help='specifies a separate dataset to tra
 parser.add_argument('--image_batch', type=int, default=10, help='number of images in image batch')
 parser.add_argument('--video_batch', type=int, default=10, help='number of videos in video batch')
 
-parser.add_argument('--image_size', type=int, default=256, help='resize all frames to this size')
+parser.add_argument('--image_size', type=int, default=128, help='resize all frames to this size')
 
 parser.add_argument('--use_infogan', default=False, help='when specified infogan loss is used')
 parser.add_argument('--use_categories', default=True,help='when specified ground truth categories are used to train CategoricalVideoDiscriminator')
-parser.add_argument('--use_reconstruct', default=False, help='when specified reconstruction is used')
+parser.add_argument('--use_reconstruct', default=True, help='when specified reconstruction is used')
 
 parser.add_argument('--use_noise', help='when specified instance noise is used')
 

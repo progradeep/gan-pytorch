@@ -283,8 +283,13 @@ class VideoGenerator(nn.Module):
 
         #content = np.random.normal(0, 1, (num_samples, self.dim_z_content)).astype(np.float32)
         content = self.encoder_content(image_batches)
-        content = content.data.view(num_samples, self.dim_z_content)
-        content = torch.cat([content] * 10)
+        
+        #content = content.data.view(num_samples, self.dim_z_content)
+        #content = torch.cat([content] * 10)
+        content = content.data.view(num_samples, 1, self.dim_z_content)
+        content = torch.cat([content] * video_len, dim=1)
+        content = content.view(num_samples * video_len, content.size(2))
+        
         #content = torch.from_numpy(content)
         #if torch.cuda.is_available():
         #    content = content.cuda()
