@@ -147,6 +147,7 @@ class Trainer(object):
 
         A_loader, B_loader = iter(self.image_loader), iter(self.video_loader)
         valid_x_A, valid_x_B = A_loader.next(), B_loader.next()
+        valid_x_A_categ = valid_x_A["categories"]
         valid_x_A, valid_x_B = valid_x_A["images"], valid_x_B["images"]
         valid_x_B = valid_x_B.permute(0,2,1,3,4)
 
@@ -178,7 +179,6 @@ class Trainer(object):
 
 
                 realIm, realGif = Variable(realIm.cuda(), requires_grad=False), Variable(realGif.cuda(), requires_grad=False)
-
                 image_batch_size = realIm.size(0)
 
                 ############################
@@ -188,7 +188,7 @@ class Trainer(object):
 
                 #### train with gif
                 # GAN loss: D_A(G_A(A))
-                fake = (self.generator.sample_videos(realIm, image_batch_size), self.generator.sample_images(realIm, image_batch_size))
+                fake = (self.generator.sample_videos(realIm, realImCateg, image_batch_size), self.generator.sample_images(realIm, realImCateg, image_batch_size))
                 fakeGif, generated_categ = fake[0][0], fake[0][1]
 
                 output, fake_categ = self.video_discriminator(fakeGif)
@@ -199,7 +199,6 @@ class Trainer(object):
                 if self.config.use_reconstruct:
                     recon = self.video_reconstructor(fakeGif)
                     loss_G += torch.mean(torch.abs(recon - realIm))
-
                 if self.config.use_infogan:
                     loss_G += self.category_criterion(fake_categ.squeeze(), generated_categ)
 
@@ -268,7 +267,7 @@ class Trainer(object):
 
 
                 if step % self.log_interval == 0:
-                    fake = (self.generator.sample_videos(valid_x_A, self.image_batch_size), self.generator.sample_images(valid_x_A, self.image_batch_size))
+                    fake = (self.generator.sample_videos(valid_x_A, valid_x_A_categ, self.image_batch_size), self.generator.sample_images(valid_x_A, valid_x_A_categ, self.image_batch_size))
                     fakeGif = fake[0][0]
                     fakeGif = fakeGif.permute(0, 2, 1, 3, 4)
                     fakeGif = fakeGif.resize(self.video_batch_size * self.video_length, self.n_channels, self.image_size, self.image_size)
