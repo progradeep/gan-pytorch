@@ -51,11 +51,6 @@ class ImageDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
 
             Noise(use_noise, sigma=noise_sigma),
-            nn.Conv2d(ndf * 4, ndf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-
-            Noise(use_noise, sigma=noise_sigma),
             nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
@@ -90,11 +85,6 @@ class PatchImageDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
 
             Noise(use_noise, sigma=noise_sigma),
-            nn.Conv2d(ndf * 4, ndf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-
-            Noise(use_noise, sigma=noise_sigma),
             nn.Conv2d(ndf * 4, 1, 4, 2, 1, bias=False),
         )
 
@@ -124,11 +114,6 @@ class PatchVideoDiscriminator(nn.Module):
 
             Noise(use_noise, sigma=noise_sigma),
             nn.Conv3d(ndf * 2, ndf * 4, 4, stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
-            nn.BatchNorm3d(ndf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-
-            Noise(use_noise, sigma=noise_sigma),
-            nn.Conv3d(ndf * 4, ndf * 4, 4, stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
             nn.BatchNorm3d(ndf * 4),
             nn.LeakyReLU(0.2, inplace=True),
 
@@ -166,12 +151,7 @@ class VideoDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
 
             Noise(use_noise, sigma=noise_sigma),
-            nn.Conv3d(ndf * 4, ndf * 4, (2, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
-            nn.BatchNorm3d(ndf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-
-            Noise(use_noise, sigma=noise_sigma),
-            nn.Conv3d(ndf * 4, ndf * 8, (2, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
+            nn.Conv3d(ndf * 4, ndf * 8, (3, 4, 4), stride=(1, 2, 2), padding=(0, 1, 1), bias=False),
             nn.BatchNorm3d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
 
@@ -213,31 +193,18 @@ class VideoGenerator(nn.Module):
         self.dim_z_motion = dim_z_motion
         self.video_length = video_length
 
-        dim_z = dim_z_motion + dim_z_category
+        dim_z = dim_z_motion + dim_z_category + dim_z_content
 
         self.recurrent = nn.GRUCell(dim_z_motion, dim_z_motion)
 
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(dim_z, ngf * 8, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 8),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+        self.main = nn.Sequential(
+            nn.ConvTranspose2d(dim_z, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
             nn.ReLU(True),
             nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
             nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
-        )
-
-        self.main = nn.Sequential(
-            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 2),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(ngf, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.ReLU(True),
             nn.ConvTranspose2d(ngf, self.n_channels, 4, 2, 1, bias=False),
@@ -257,33 +224,21 @@ class VideoGenerator(nn.Module):
             nn.Conv2d(ngf * 4, ngf * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 8), 
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ngf * 8, ngf * 8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 8), 
-            nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(ngf * 8, dim_z_motion, 4, 1, 0, bias=False)
         )
 
         self.encoder_content = nn.Sequential(
-            nn.ReflectionPad2d(3),
-            nn.Conv2d(self.n_channels + dim_z, ngf, 7, 1, 0, bias=False),
+            nn.Conv2d(self.n_channels, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ngf, ngf * 2, 3, 2, 1, bias=False),
+            nn.Conv2d(ngf, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ngf * 2, ngf * 4, 3, 2, 1, bias=False),
+            nn.Conv2d(ngf * 2, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ngf * 4, ngf * 4, 3, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ngf * 4, ngf * 4, 3, 2, 1, bias=False)
+            nn.Conv2d(ngf * 4, dim_z_content, 4, 2, 1, bias=False),
         )
-
-        self.resnet = []
-        for i in range(3):
-            self.resnet.append(resnet_block(ngf * 4 + dim_z, 3, 1, 1))
-        self.resnet = nn.Sequential(*self.resnet)
 
     def sample_z_m(self, image_batches, num_samples, video_len=None):
         video_len = video_len if video_len is not None else self.video_length
@@ -302,10 +257,11 @@ class VideoGenerator(nn.Module):
 
         return z_m
 
-    def sample_z_categ(self, num_samples, video_len):
+    def sample_z_categ(self, num_samples, video_len, categories):
         video_len = video_len if video_len is not None else self.video_length
 
-        classes_to_generate = np.random.randint(self.dim_z_category, size=num_samples)
+        #classes_to_generate = np.random.randint(self.dim_z_category, size=num_samples)
+        classes_to_generate = categories
         one_hot = np.zeros((num_samples, self.dim_z_category), dtype=np.float32)
         one_hot[np.arange(num_samples), classes_to_generate] = 1
         one_hot_video = np.repeat(one_hot, video_len, axis=0)
@@ -322,65 +278,57 @@ class VideoGenerator(nn.Module):
 
         #content = np.random.normal(0, 1, (num_samples, self.dim_z_content)).astype(np.float32)
         content = self.encoder_content(image_batches)
-        content = torch.cat([content.data.view(num_samples, 1, content.data.size(1), content.data.size(2), content.data.size(3))] * video_len, dim=1)
-        content = content.view(num_samples * video_len, content.size(2), content.size(3), content.size(4))
+        
+        #content = content.data.view(num_samples, self.dim_z_content)
+        #content = torch.cat([content] * 10)
+        content = content.data.view(num_samples, 1, self.dim_z_content, content.size(2), content.size(3))
+        content = torch.cat([content] * video_len, dim=1)
+        content = content.view(num_samples * video_len, self.dim_z_content, content.size(3), content.size(4))
+        
         #content = torch.from_numpy(content)
         #if torch.cuda.is_available():
         #    content = content.cuda()
         return Variable(content)
 
-    def sample_z_video(self, image_batches, num_samples, video_len=None):
-        z_category, z_category_labels = self.sample_z_categ(num_samples, video_len)
+    def sample_z_video(self, image_batches, categories, num_samples, video_len=None):
+        z_content = self.sample_z_content(image_batches, num_samples, video_len)
+        
+        z_category, z_category_labels = self.sample_z_categ(num_samples, video_len, categories)
         
         z_motion = self.sample_z_m(image_batches, num_samples, video_len)
-        
-        z = torch.cat([z_category, z_motion], dim=1)
+       
+        z_category = z_category.unsqueeze(2).unsqueeze(3)
+        z_category = z_category.expand(z_category.size(0), z_category.size(1), z_content.size(2), z_content.size(3))
+        z_motion = z_motion.unsqueeze(2).unsqueeze(3)
+        z_motion = z_motion.expand(z_motion.size(0), z_motion.size(1), z_content.size(2), z_content.size(3))
+
+        z = torch.cat([z_content, z_category, z_motion], dim=1)
 
         return z, z_category_labels
 
-    def sample_videos(self, image_batches, num_samples, video_len=None):
+    def sample_videos(self, image_batches, categories, num_samples, video_len=None):
         video_len = video_len if video_len is not None else self.video_length
 
-        z, z_category_labels = self.sample_z_video(image_batches, num_samples, video_len)
-        z = z.view(z.size(0), z.size(1), 1, 1)
-        h = z.expand(z.size(0), z.size(1), image_batches.size(2), image_batches.size(3))
-        image_batches = torch.cat([image_batches.data.view(num_samples, 1, image_batches.data.size(1), image_batches.data.size(2), image_batches.data.size(3))] * video_len, dim=1)
-        image_batches = image_batches.view(num_samples * video_len, image_batches.size(2), image_batches.size(3), image_batches.size(4))
-        
-        #h = self.decoder(z.view(z.size(0), z.size(1), 1, 1))
-        #h = torch.cat([h_content, h], dim=1)
-        #h = self.resnet(h)
-        #h_content = self.sample_z_content(image_batches, num_samples, video_len)
-        h = torch.cat([image_batches, h.data], dim=1)
-        h = self.encoder_content(Variable(h))
-        h = self.main(h)
+        z, z_category_labels = self.sample_z_video(image_batches, categories, num_samples, video_len)
 
+        h = self.main(z)
         h = h.view(int(h.size(0) / video_len), video_len, self.n_channels, h.size(3), h.size(3))
         h = h.permute(0, 2, 1, 3, 4)
-        z_category_labels = torch.from_numpy(z_category_labels).type("torch.LongTensor")
+        #z_category_labels = torch.from_numpy(z_category_labels).type("torch.LongTensor")
+        z_category_labels = z_category_labels.type("torch.LongTensor")
 
         if torch.cuda.is_available():
             z_category_labels = z_category_labels.cuda()
 
         return h, Variable(z_category_labels, requires_grad=False)
 
-    def sample_images(self, image_batches, num_samples):
+    def sample_images(self, image_batches, categories, num_samples):
         #z, z_category_labels = self.sample_z_video(image_batches, num_samples * self.video_length * 2)
-        z, z_category_labels = self.sample_z_video(image_batches, num_samples)
+        z, z_category_labels = self.sample_z_video(image_batches, categories, num_samples)
 
         j = np.sort(np.random.choice(z.size(0), num_samples, replace=False)).astype(np.int64)
         z = z[j, ::]
-        z = z.view(z.size(0), z.size(1), 1, 1)
-        #h_content = self.sample_z_content(image_batches, num_samples, 1)
-        #h = z.expand(z.size(0), z.size(1), h_content.size(2), h_content.size(3))
-        h = z.expand(z.size(0), z.size(1), image_batches.size(2), image_batches.size(3))
-        h = torch.cat([image_batches.data, h.data], dim=1)
-        h = self.encoder_content(Variable(h))
-
-        #h = self.decoder(z)
-        #h = torch.cat([h_content, h], dim=1)
-        #h = self.resnet(h)
-        h = self.main(h)
+        h = self.main(z)
 
         return h, None
 
@@ -483,22 +431,4 @@ class VideoReconstructor(nn.Module):
         h = h.view(-1, self.dim_z, 1, 1)
         return self.decoder(h)
 
-# resnet block with reflect padding
-class resnet_block(nn.Module):
-    def __init__(self, channel, kernel, stride, padding):
-        super(resnet_block, self).__init__()
-        self.padding = padding
-        self.main = nn.Sequential(
-            nn.ReflectionPad2d(self.padding),
-            nn.Conv2d(channel, channel, kernel, stride, 0),
-            nn.InstanceNorm2d(channel),
-            nn.ReLU(True),
 
-            nn.ReflectionPad2d(self.padding),
-            nn.Conv2d(channel, channel, kernel, stride, 0),
-            nn.InstanceNorm2d(channel))
-
-    def forward(self, input):
-        x = self.main(input)
-
-        return input + x

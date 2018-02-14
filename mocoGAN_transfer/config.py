@@ -36,7 +36,7 @@ parser.add_argument('--weight_decay', type=float, default=0.00001, help='weight_
 
 parser.add_argument('--dim_z_content', type=int, default=50, help='dimensionality of the content input, ie hidden space')
 parser.add_argument('--dim_z_motion', type=int, default=10, help='dimensionality of the motion input')
-parser.add_argument('--dim_z_category', type=int, default=5, help='dimensionality of categorical input')
+parser.add_argument('--dim_z_category', type=int, default=101, help='dimensionality of categorical input')
 
 parser.add_argument('--cuda', action='store_true', help='enables cuda')
 parser.add_argument('--outf', default=None, help='folder to output images and videos ans model checkpoints')
