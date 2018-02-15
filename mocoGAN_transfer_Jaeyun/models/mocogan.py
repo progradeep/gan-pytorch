@@ -198,10 +198,7 @@ class VideoGenerator(nn.Module):
         self.recurrent = nn.GRUCell(dim_z_motion, dim_z_motion)
 
         self.main = nn.Sequential(
-            nn.ConvTranspose2d(dim_z, ngf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 4),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(dim_z, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
             nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
@@ -234,10 +231,7 @@ class VideoGenerator(nn.Module):
             nn.Conv2d(ngf, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ngf * 2, ngf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ngf * 4, dim_z_content, 4, 2, 1, bias=False),
+            nn.Conv2d(ngf * 2, dim_z_content, 4, 2, 1, bias=False)
         )
 
     def sample_z_m(self, image_batches, num_samples, video_len=None):
