@@ -203,10 +203,10 @@ class Trainer(object):
                 loss_G = self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
                 output, _ = self.seq_discriminator(fakeGif)
-                loss_G += self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
+                loss_G += 10 * self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
 
-                loss_G += 100 * torch.mean(torch.abs(fakeGif[:, :, 0, :, :] - realIm))
+                loss_G += 50 * torch.mean(torch.abs(fakeGif[:, :, 0, :, :] - realIm))
 
 
                 if self.config.use_reconstruct:
@@ -302,10 +302,10 @@ class Trainer(object):
                     fakeGif = fakeGif.resize(self.video_batch_size * self.video_length, self.n_channels, self.image_size, self.image_size)
                     vutils.save_image(denorm(fakeGif.data), '%s/fakeGif_AB_%03d_%d.png' % (self.outf, epoch, step), nrow=self.video_length)
 
-                    fakeIm = fake[1][0].resize(self.image_batch_size, self.n_channels, self.image_size,
-                                                self.image_size)
-                    vutils.save_image(denorm(fakeIm.data), '%s/fakeIm_AB_%03d_%d.png' % (self.outf, epoch, step),
-                                      nrow=1)
+                    #fakeIm = fake[1][0].resize(self.image_batch_size, self.n_channels, self.image_size,
+                    #                            self.image_size)
+                    #vutils.save_image(denorm(fakeIm.data), '%s/fakeIm_AB_%03d_%d.png' % (self.outf, epoch, step),
+                    #                  nrow=1)
 
                 if step% self.checkpoint_step == 0 and step != 0:
                    torch.save(self.generator.state_dict(), '%s/netG_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
