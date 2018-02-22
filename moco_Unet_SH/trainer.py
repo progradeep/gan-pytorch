@@ -289,7 +289,7 @@ class Trainer(object):
                 step_end_time = time.time()
 
 
-                print('[%d/%d][%d/%d] - time: %.2f, loss_D_V: %.3f, loss_D_I: %.3f, loss_D_S: %.3f,'
+                print('[%d/%d][%d/%d] - time: %.2f, loss_D_V: %.3f, loss_D_I: %.3f, loss_D_S: %.3f, '
                       'loss_G: %.3f'
                       % (epoch, self.train_batches, step, len(self.video_loader), step_end_time - start_time,
                          loss_D_V, loss_D_I, loss_D_S, loss_G))
