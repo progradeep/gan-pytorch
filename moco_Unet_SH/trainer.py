@@ -203,10 +203,10 @@ class Trainer(object):
                 loss_G = self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
                 output, _ = self.seq_discriminator(fakeGif)
-                loss_G += 100* self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
+                loss_G += self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
 
-                loss_G += torch.mean(torch.abs(fakeGif[:, :, 0, :, :] - realIm))
+                loss_G += 100 * torch.mean(torch.abs(fakeGif[:, :, 0, :, :] - realIm))
 
 
                 if self.config.use_reconstruct:
