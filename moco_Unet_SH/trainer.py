@@ -33,6 +33,8 @@ class Trainer(object):
         self.beta1 = config.beta1
         self.beta2 = config.beta2
         self.weight_decay = config.weight_decay
+        self.lambda_seq = config.lambda_seq
+        self.lambda_l1 = config.lambda_l1
 
         self.image_discriminator = config.image_discriminator
         self.video_discriminator = config.video_discriminator
@@ -78,18 +80,21 @@ class Trainer(object):
         self.start_step = str(max(steps))
 
         G_filename = '{}/netG_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
+        D_S_filename = '{}/netD_S_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
         D_V_filename = '{}/netD_V_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
         D_I_filename = '{}/netD_I_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
         Im_Recon_filename = '{}/ImageRecon_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
         Video_Recon_filename = '{}/VideoRecon_epoch-{}_step-{}.pth'.format(self.outf, self.start_epoch, self.start_step)
 
         self.generator.load_state_dict(torch.load(G_filename))
+        self.seq_discriminator.load_state_dict(torch.load(D_S_filename))
         self.video_discriminator.load_state_dict(torch.load(D_V_filename))
         self.image_discriminator.load_state_dict(torch.load(D_I_filename))
         self.image_reconstructor.load_state_dict(torch.load(Im_Recon_filename))
         self.video_reconstructor.load_state_dict(torch.load(Video_Recon_filename))
 
         print("[*] Model loaded: {}".format(G_filename))
+        print("[*] Model loaded: {}".format(D_S_filename))
         print("[*] Model loaded: {}".format(D_V_filename))
         print("[*] Model loaded: {}".format(D_I_filename))
         print("[*] Model loaded: {}".format(Im_Recon_filename))
@@ -203,10 +208,10 @@ class Trainer(object):
                 loss_G = self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
                 output, _ = self.seq_discriminator(fakeGif)
-                loss_G += 10 * self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
+                loss_G += self.lambda_seq * self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
 
-                loss_G += 50 * torch.mean(torch.abs(fakeGif[:, :, 0, :, :] - realIm))
+                loss_G += self.lambda_l1 * torch.mean(torch.abs(fakeGif[:, :, 0, :, :] - realIm))
 
 
                 if self.config.use_reconstruct:
@@ -307,12 +312,15 @@ class Trainer(object):
                     #vutils.save_image(denorm(fakeIm.data), '%s/fakeIm_AB_%03d_%d.png' % (self.outf, epoch, step),
                     #                  nrow=1)
 
-                if step% self.checkpoint_step == 0 and step != 0:
-                   torch.save(self.generator.state_dict(), '%s/netG_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                   torch.save(self.video_discriminator.state_dict(), '%s/netD_V_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
-                   torch.save(self.image_discriminator.state_dict(), '%s/netD_I_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+            if step% self.checkpoint_step == 0:
+                torch.save(self.generator.state_dict(), '%s/netG_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                torch.save(self.seq_discriminator.state_dict(), '%s/netD_S_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                torch.save(self.video_discriminator.state_dict(), '%s/netD_V_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                torch.save(self.image_reconstructor.state_dict(), '%s/ImageRecon_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                torch.save(self.video_reconstructor.state_dict(), '%s/VideoRecon_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
+                torch.save(self.image_discriminator.state_dict(), '%s/netD_I_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
 
-                   print("Saved checkpoint")
+                print("Saved checkpoint")
 
     def _get_variable(self, inputs):
         out = Variable(inputs.cuda())
