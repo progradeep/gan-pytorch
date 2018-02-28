@@ -21,7 +21,7 @@ parser.add_argument('--noise_sigma', type=float, default=0, help='when use_noise
 parser.add_argument('--image_discriminator', default='PatchImageDiscriminator', help='specifies image disciminator type (see vgan.py for a list of available models')
 parser.add_argument('--video_discriminator', default='CategoricalVideoDiscriminator', help='specifies video discriminator type (see vgan.py for a list of available models')
 
-parser.add_argument('--video_length', type=int, default=32, help='length of the video')
+parser.add_argument('--video_length', type=int, default=10, help='length of the video')
 parser.add_argument('--log_interval', type=int, default=100, help='save valid gif and image')
 parser.add_argument('--checkpoint_step', type=int, default=50, help='save checkpoint')
 parser.add_argument('--n_channels', type=int, default=3, help='number of channels in the input data')
