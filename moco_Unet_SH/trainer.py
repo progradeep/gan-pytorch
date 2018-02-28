@@ -312,7 +312,7 @@ class Trainer(object):
                     #vutils.save_image(denorm(fakeIm.data), '%s/fakeIm_AB_%03d_%d.png' % (self.outf, epoch, step),
                     #                  nrow=1)
 
-            if step% self.checkpoint_step == 0:
+            if epoch % self.checkpoint_step == 0:
                 torch.save(self.generator.state_dict(), '%s/netG_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
                 torch.save(self.seq_discriminator.state_dict(), '%s/netD_S_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
                 torch.save(self.video_discriminator.state_dict(), '%s/netD_V_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
