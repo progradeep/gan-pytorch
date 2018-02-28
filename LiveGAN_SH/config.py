@@ -29,7 +29,7 @@ parser.add_argument('--batches', type=int, default=100000, help='specify number 
 
 parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--lambda_seq', type=float, default=10, help='lambda for sequence loss')
-parser.add_argument('--lambda_l1', type=float, default=50, help='lambda for l1 loss')
+parser.add_argument('--lambda_l1', type=float, default=100, help='lambda for l1 loss')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for adam. default=0.999')
 parser.add_argument('--weight_decay', type=float, default=0.00001, help='weight_decay for adam. default=0.00001')

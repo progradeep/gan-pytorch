@@ -172,7 +172,7 @@ class Trainer(object):
 
         start_time = time.time()
 
-        for epoch in range(self.train_batches):
+        for epoch in range(self.start_epoch,self.train_batches):
 
             for step in range(len(self.video_loader)):
                 try:
