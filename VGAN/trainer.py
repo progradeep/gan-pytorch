@@ -96,15 +96,12 @@ class Trainer(object):
         if self.outf != None:
             self.load_model()
 
-
     def train(self):
         self.gan_criterion = nn.BCEWithLogitsLoss()
-        self.category_criterion = nn.CrossEntropyLoss()
 
         if self.use_cuda:
             self.generator.cuda()
             self.discriminator.cuda()
-
 
         # create optimizers
         opt_generator = optim.Adam(self.generator.parameters(), lr=self.lr, betas=(self.beta1, self.beta2), weight_decay=self.weight_decay)
@@ -113,7 +110,6 @@ class Trainer(object):
 
         A_loader, B_loader = iter(self.image_loader), iter(self.video_loader)
         valid_x_A, valid_x_B = A_loader.next(), B_loader.next()
-        valid_x_A_categ = valid_x_A["categories"]
         valid_x_A, valid_x_B = valid_x_A["images"], valid_x_B["images"]
         valid_x_B = valid_x_B.permute(0,2,1,3,4)
 
@@ -130,13 +126,11 @@ class Trainer(object):
             for step in range(len(self.video_loader)):
                 try:
                     realIm, realGif = A_loader.next(), B_loader.next()
-                    realGifCateg, realImCateg = realGif["categories"], realIm["categories"]
                     realGif, realIm = realGif["images"], realIm["images"]
 
                 except StopIteration:
                     A_loader, B_loader = iter(self.image_loader), iter(self.video_loader)
                     realIm, realGif = A_loader.next(), B_loader.next()
-                    realGifCateg, realImCateg = realGif["categories"], realIm["categories"]
                     realGif, realIm = realGif["images"], realIm["images"]
 
                 if realIm.size(0) != realGif.size(0):
@@ -145,7 +139,6 @@ class Trainer(object):
 
 
                 realIm, realGif = Variable(realIm.cuda(), requires_grad=False), Variable(realGif.cuda(), requires_grad=False)
-                image_batch_size = realIm.size(0)
 
                 ############################
                 # (1) Update G network: minimize Lgan(MSE) + Lcycle(L1)
@@ -154,7 +147,6 @@ class Trainer(object):
 
                 # GAN loss: D_A(G_A(A))
                 fakeGif = self.generator(realIm)
-
 
                 output = self.discriminator(fakeGif)
                 loss_G = self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
@@ -176,7 +168,7 @@ class Trainer(object):
                 loss_D_real = self.gan_criterion(D_real, Variable(torch.ones(D_real.size()).cuda()))
 
                 # train with fake
-                D_fake = self.video_discriminator(fakeGif.detach())
+                D_fake = self.discriminator(fakeGif.detach())
                 loss_D_fake = self.gan_criterion(D_fake, Variable(torch.zeros(D_fake.size()).cuda()))
 
                 loss_D = loss_D_real + loss_D_fake

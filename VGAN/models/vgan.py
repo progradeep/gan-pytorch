@@ -6,8 +6,6 @@ from torch.autograd import Variable
 
 import numpy as np
 
-torch.backends.cudnn.benchmark = False
-
 if torch.cuda.is_available():
     T = torch.cuda
 else:
@@ -77,23 +75,25 @@ class VideoGenerator(nn.Module):
         self.video = nn.Sequential(
             nn.ConvTranspose3d(1024, 1024, kernel_size=(2,4,4)),
             nn.BatchNorm3d(1024),
-            nn.ReLU(True),)
-        self.video2=nn.Sequential(
-            nn.ConvTranspose3d(1024, 512, 4, 2, 1, bias=True),
+            nn.ReLU(True),
+
+            nn.ConvTranspose3d(1024, 512, 4, stride=(1,2,2), padding=(0,1,1), bias=True),
             nn.BatchNorm3d(512),
-            nn.ReLU(True),)
-        self.v3 = nn.Sequential(
-            nn.ConvTranspose3d(512, 256, 4, 2, 1, bias=True),
+            nn.ReLU(True),
+
+            nn.ConvTranspose3d(512, 256, 4, stride=(1,2,2), padding=(0,1,1), bias=True),
             nn.BatchNorm3d(256),
-            nn.ReLU(True),)
-        self.v4 = nn.Sequential(
-            nn.ConvTranspose3d(256, 128, 4, 2, 1, bias=True),
+            nn.ReLU(True),
+
+            nn.ConvTranspose3d(256, 128, kernel_size=(2, 4, 4), stride=(1,2,2), padding=(0,1,1), bias=True),
             nn.BatchNorm3d(128),
             nn.ReLU(True),
         )
 
-        self.gen_net = nn.Sequential(nn.ConvTranspose3d(128, 3, 4, 2, 1), nn.Tanh())
-        self.mask_net = nn.Sequential(nn.ConvTranspose3d(128, 1, 4, 2, 1), nn.Sigmoid())
+        self.gen_net = nn.Sequential(nn.ConvTranspose3d(128, 3, kernel_size=(2, 4, 4), stride=(1,2,2), padding=(0,1,1)),
+                                     nn.Tanh())
+        self.mask_net = nn.Sequential(nn.ConvTranspose3d(128, 1, kernel_size=(2,4,4), stride=(1,2,2), padding=(0,1,1)),
+                                      nn.Sigmoid())
 
         self.encoder = nn.Sequential(
             nn.Conv2d(self.n_channels, 128, 4, 2, 1, bias=True),
@@ -115,29 +115,21 @@ class VideoGenerator(nn.Module):
 
 
     def forward(self, input):
-        print("generator input:", input.shape)
+        # print("generator input:", input.shape)
         x = self.encoder(input) # bs, 1024, 1, 1
-        x = x.unsqueeze(2) # bs, 1024, 1, 1, 1
-        print(x.shape)
-        video = self.video(x)
-        print("video",video.shape)
-
-        v2 = self.video2(video)
-        print("video",v2.shape)
-
-        v3 = self.v3(v2)
-        print("video",v3.shape)
-
-        v4 = self.v4(v3)
-        print("video",v4.shape)
+        x_v = x.unsqueeze(2) # bs, 1024, 1, 1, 1
+        # print(x_v.shape)
+        video = self.video(x_v)
 
         foregound = self.gen_net(video)
         mask = self.mask_net(video)
+        # print("fg",foregound.shape, "mask",mask.shape)
 
         background = self.background(x)
+        # print("bg", background.shape)
         background_frames = background.unsqueeze(2).repeat(1,1,self.video_length,1,1)
-        print("fg",foregound.shape,"mask",mask.shape,"bg",background.shape)
+        # print("fg",foregound.shape,"mask",mask.shape,"bg",background.shape)
 
-        output = mask * foregound + (1-mask) * background
-        print("output",output.shape)
+        output = mask * foregound + (1-mask) * background_frames
+        # print("output",output.shape)
         return output
