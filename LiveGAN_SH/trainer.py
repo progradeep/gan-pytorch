@@ -102,7 +102,8 @@ class Trainer(object):
 
 
     def build_model(self):
-        self.generator = mocogan.VideoGenerator(self.n_channels, self.dim_z_content, self.dim_z_category, self.dim_z_motion, self.video_length)
+        self.generator = mocogan.VideoGenerator(self.n_channels, self.dim_z_content,
+                                                self.dim_z_category, self.dim_z_motion, self.video_length)
         self.seq_discriminator = mocogan.SequenceDiscriminator(video_len=self.video_length,
                                                           dim_z_motion=self.dim_z_motion,
                                                           n_channels=self.n_channels, use_noise=self.use_noise,
@@ -205,10 +206,10 @@ class Trainer(object):
                 fakeGif, generated_categ = fake[0][0], fake[0][1]
 
                 output, fake_categ = self.video_discriminator(fakeGif)
-                loss_G = self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
+                # loss_G = self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
                 output, _ = self.seq_discriminator(fakeGif)
-                loss_G += self.lambda_seq * self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
+                loss_G = self.lambda_seq * self.gan_criterion(output, Variable(torch.ones(output.size()).cuda()))
 
 
                 loss_G += self.lambda_l1 * torch.mean(torch.abs(fakeGif[:, :, 0, :, :] - realIm))
@@ -254,22 +255,23 @@ class Trainer(object):
                 loss_D_S.backward()
                 opt_seq_discriminator.step()
 
+
                 #### train D_V ####
                 # train with real
                 self.video_discriminator.zero_grad()
 
                 D_real, real_categ = self.video_discriminator(realGif)
-                loss_D_real = self.gan_criterion(D_real, Variable(torch.ones(D_real.size()).cuda()))
-
-                # train with fake
-                D_fake, fake_categ = self.video_discriminator(fakeGif.detach())
-                loss_D_fake = self.gan_criterion(D_fake, Variable(torch.zeros(D_fake.size()).cuda()))
-
-                loss_D_V = loss_D_real + loss_D_fake
+                # loss_D_real = self.gan_criterion(D_real, Variable(torch.ones(D_real.size()).cuda()))
+                #
+                # # train with fake
+                # D_fake, fake_categ = self.video_discriminator(fakeGif.detach())
+                # loss_D_fake = self.gan_criterion(D_fake, Variable(torch.zeros(D_fake.size()).cuda()))
+                #
+                # loss_D_V = loss_D_real + loss_D_fake
 
                 if self.config.use_categories:
                     categories_gt = Variable(torch.squeeze(realGifCateg.long()), requires_grad=False).cuda()
-                    loss_D_V += self.category_criterion(real_categ.squeeze(), categories_gt)
+                    loss_D_V = self.category_criterion(real_categ.squeeze(), categories_gt)
 
                 loss_D_V.backward()
                 opt_video_discriminator.step()
@@ -294,10 +296,10 @@ class Trainer(object):
                 step_end_time = time.time()
 
 
-                print('[%d/%d][%d/%d] - time: %.2f, loss_D_V: %.3f, loss_D_I: %.3f, loss_D_S: %.3f, '
+                print('[%d/%d][%d/%d] - time: %.2f, loss_D_V: %.3f, loss_D_I: %.3f, '
                       'loss_G: %.3f'
                       % (epoch, self.train_batches, step, len(self.video_loader), step_end_time - start_time,
-                         loss_D_V, loss_D_I, loss_D_S, loss_G))
+                         loss_D_V, loss_D_I, loss_G))
 
 
                 if step % self.log_interval == 0:

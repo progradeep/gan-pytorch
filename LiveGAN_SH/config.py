@@ -21,7 +21,7 @@ parser.add_argument('--video_discriminator', default='CategoricalVideoDiscrimina
 
 parser.add_argument('--video_length', type=int, default=10, help='length of the video')
 parser.add_argument('--log_interval', type=int, default=100, help='save valid gif and image')
-parser.add_argument('--checkpoint_step', type=int, default=10, help='save checkpoint')
+parser.add_argument('--checkpoint_step', type=int, default=100, help='save checkpoint')
 parser.add_argument('--n_channels', type=int, default=3, help='number of channels in the input data')
 
 parser.add_argument('--every_nth', type=int, default=4, help='sample training videos using every nth frame')
