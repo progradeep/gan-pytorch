@@ -192,7 +192,7 @@ class Trainer(object):
                     vutils.save_image(denorm(fakeGif.data), '%s/fakeGif_AB_%03d_%d.png' % (self.outf, epoch, step), nrow=self.video_length)
 
 
-            if step% self.checkpoint_step == 0:
+            if epoch % self.checkpoint_step == 0:
                 torch.save(self.generator.state_dict(), '%s/netG_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
                 torch.save(self.discriminator.state_dict(), '%s/netD_epoch-%d_step-%s.pth' % (self.outf, epoch, step))
 

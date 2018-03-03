@@ -73,7 +73,7 @@ class VideoGenerator(nn.Module):
             )
 
         self.video = nn.Sequential(
-            nn.ConvTranspose3d(1024, 1024, kernel_size=(2,4,4)),
+            nn.ConvTranspose3d(1024, 1024, kernel_size=(2,4,4), stride=(1,2,2), padding=0),
             nn.BatchNorm3d(1024),
             nn.ReLU(True),
 
