@@ -21,14 +21,14 @@ parser.add_argument('--video_discriminator', default='CategoricalVideoDiscrimina
 
 parser.add_argument('--video_length', type=int, default=10, help='length of the video')
 parser.add_argument('--log_interval', type=int, default=100, help='save valid gif and image')
-parser.add_argument('--checkpoint_step', type=int, default=100, help='save checkpoint')
+parser.add_argument('--checkpoint_step', type=int, default=10, help='save checkpoint')
 parser.add_argument('--n_channels', type=int, default=3, help='number of channels in the input data')
 
 parser.add_argument('--every_nth', type=int, default=4, help='sample training videos using every nth frame')
 parser.add_argument('--batches', type=int, default=100000, help='specify number of batches to train')
 
 parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
-parser.add_argument('--lambda_seq', type=float, default=10, help='lambda for sequence loss')
+parser.add_argument('--lambda_seq', type=float, default=1, help='lambda for sequence loss')
 parser.add_argument('--lambda_l1', type=float, default=100, help='lambda for l1 loss')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for adam. default=0.999')
